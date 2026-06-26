@@ -1,11 +1,12 @@
 'use client';
 import { useState, useRef } from 'react';
-import { X, ExternalLink, Trash2, Copy, Upload, Image } from 'lucide-react';
-import { ContentCard, CardType } from '@/lib/types';
+import { X, ExternalLink, Trash2, Copy, Upload, Image, CheckCircle2, ExternalLink as LinkIcon } from 'lucide-react';
+import { ContentCard, CardType, Pipeline } from '@/lib/types';
 
 interface Props {
   card: ContentCard;
   users: string[];
+  pipeline?: Pipeline;
   onSave: (card: ContentCard) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -26,7 +27,7 @@ const labelStyle: React.CSSProperties = {
 
 const row: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 
-export default function CardModal({ card, users, onSave, onDelete, onClose }: Props) {
+export default function CardModal({ card, users, pipeline, onSave, onDelete, onClose }: Props) {
   const [data, setData] = useState<ContentCard>({ ...card });
 
   const titleRef = useRef<HTMLInputElement>(null);
@@ -37,6 +38,7 @@ export default function CardModal({ card, users, onSave, onDelete, onClose }: Pr
   const referenceRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<HTMLInputElement>(null);
   const musicRef = useRef<HTMLInputElement>(null);
+  const videoLinkRef = useRef<HTMLInputElement>(null);
   const ideaRef = useRef<HTMLTextAreaElement>(null);
   const hookRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -63,6 +65,7 @@ export default function CardModal({ card, users, onSave, onDelete, onClose }: Pr
       referenceLink: referenceRef.current?.value ?? data.referenceLink,
       frameLink: frameRef.current?.value ?? data.frameLink,
       musicLink: musicRef.current?.value ?? data.musicLink,
+      videoLink: videoLinkRef.current?.value ?? data.videoLink,
       idea: ideaRef.current?.value ?? data.idea,
       hook: hookRef.current?.value ?? data.hook,
       body: bodyRef.current?.value ?? data.body,
@@ -72,12 +75,25 @@ export default function CardModal({ card, users, onSave, onDelete, onClose }: Pr
     onClose();
   };
 
+  const handleApprove = () => {
+    if (!pipeline) return;
+    const approvedStage = pipeline.stages.find(s => s.name.toLowerCase().includes('approved'));
+    if (approvedStage && data.stageId !== approvedStage.id) {
+      setData(prev => ({ ...prev, stageId: approvedStage.id }));
+    }
+  };
+
+  const currentStage = pipeline?.stages.find(s => s.id === data.stageId);
+  const isApproved = currentStage?.name.toLowerCase().includes('approved') || 
+                     currentStage?.name.toLowerCase().includes('green') ||
+                     currentStage?.name.toLowerCase().includes('posted');
+
   return (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ background: '#13151e', borderRadius: 16, width: '100%', maxWidth: 680, maxHeight: '92vh', overflowY: 'auto', border: '1px solid #2d3148', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: '#13151e', borderRadius: 16, width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', border: '1px solid #2d3148', display: 'flex', flexDirection: 'column' }}>
 
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #1e2130', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -88,53 +104,149 @@ export default function CardModal({ card, users, onSave, onDelete, onClose }: Pr
           </button>
         </div>
 
-        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* Thumbnail */}
-          <div style={row}>
-            <label style={labelStyle}>Thumbnail</label>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                width: '100%', height: 160, borderRadius: 10, border: '1px dashed #2d3148',
-                background: '#1a1d26', cursor: 'pointer', overflow: 'hidden', position: 'relative',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                transition: 'border-color 0.15s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = '#6366f1')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = '#2d3148')}
-            >
-              {data.thumbnail ? (
-                <>
-                  <img src={data.thumbnail} alt="thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{
-                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    opacity: 0, transition: 'opacity 0.15s',
-                  }}
-                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                    onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
+        {/* Quick Actions Bar */}
+        {pipeline && (
+          <div style={{ padding: '12px 24px', borderBottom: '1px solid #1e2130', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {/* Pipeline Status Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Stage</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {pipeline.stages.map(stage => (
+                  <button
+                    key={stage.id}
+                    onClick={() => setData(prev => ({ ...prev, stageId: stage.id }))}
+                    style={{
+                      padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                      border: `1px solid ${data.stageId === stage.id ? stage.color : '#2d3148'}`,
+                      background: data.stageId === stage.id ? `${stage.color}22` : 'transparent',
+                      color: data.stageId === stage.id ? stage.color : '#64748b',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}
                   >
-                    <span style={{ color: '#fff', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Upload size={14} /> Replace
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#475569' }}>
-                  <Image size={28} />
-                  <span style={{ fontSize: 13 }}>Click to upload thumbnail</span>
-                  <span style={{ fontSize: 11, color: '#334155' }}>PNG, JPG, WEBP</span>
-                </div>
-              )}
+                    {stage.name}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleThumbnailUpload} style={{ display: 'none' }} />
-            {data.thumbnail && (
-              <button onClick={() => setData(prev => ({ ...prev, thumbnail: '' }))}
-                style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', padding: 0 }}>
-                Remove thumbnail
+
+            {/* Approve Button */}
+            {!isApproved && (
+              <button
+                onClick={handleApprove}
+                style={{
+                  marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
+                  background: '#15803d22', border: '1px solid #16a34a',
+                  color: '#22c55e', borderRadius: 8, padding: '6px 14px',
+                  cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                }}
+              >
+                <CheckCircle2 size={14} /> Approve Idea
               </button>
             )}
+            {isApproved && (
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: '#22c55e', fontSize: 12, fontWeight: 600 }}>
+                <CheckCircle2 size={14} /> Approved
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Thumbnail + Video Preview side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: data.videoLink ? '1fr 1fr' : '1fr', gap: 16 }}>
+            <div style={row}>
+              <label style={labelStyle}>Thumbnail</label>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  width: '100%', height: 160, borderRadius: 10, border: '1px dashed #2d3148',
+                  background: '#1a1d26', cursor: 'pointer', overflow: 'hidden', position: 'relative',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'border-color 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#6366f1')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#2d3148')}
+              >
+                {data.thumbnail ? (
+                  <>
+                    <img src={data.thumbnail} alt="thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{
+                      position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      opacity: 0, transition: 'opacity 0.15s',
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
+                    >
+                      <span style={{ color: '#fff', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Upload size={14} /> Replace
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#475569' }}>
+                    <Image size={28} />
+                    <span style={{ fontSize: 13 }}>Click to upload thumbnail</span>
+                    <span style={{ fontSize: 11, color: '#334155' }}>PNG, JPG, WEBP</span>
+                  </div>
+                )}
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleThumbnailUpload} style={{ display: 'none' }} />
+              {data.thumbnail && (
+                <button onClick={() => setData(prev => ({ ...prev, thumbnail: '' }))}
+                  style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', padding: 0 }}>
+                  Remove thumbnail
+                </button>
+              )}
+            </div>
+
+            {data.videoLink && (
+              <div style={row}>
+                <label style={labelStyle}>Video Preview</label>
+                <a
+                  href={data.videoLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    width: '100%', height: 160, borderRadius: 10, border: '1px solid #2d3148',
+                    background: 'linear-gradient(135deg, #1a1d26, #13151e)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    textDecoration: 'none', gap: 8, cursor: 'pointer',
+                  }}
+                >
+                  {data.thumbnail ? (
+                    <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 10, overflow: 'hidden' }}>
+                      <img src={data.thumbnail} alt="video" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} />
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        <div style={{ width: 40, height: 40, background: 'rgba(99,102,241,0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <span style={{ color: '#fff', fontSize: 16 }}>▶</span>
+                        </div>
+                        <span style={{ color: '#fff', fontSize: 12, fontWeight: 600, background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 6 }}>Open Video</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <LinkIcon size={24} color="#6366f1" />
+                      <span style={{ color: '#6366f1', fontSize: 13, fontWeight: 600 }}>Open Video</span>
+                      <span style={{ color: '#475569', fontSize: 11 }}>{data.videoLink.includes('tiktok') ? 'TikTok' : data.videoLink.includes('instagram') ? 'Instagram' : 'External Link'}</span>
+                    </>
+                  )}
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Video Link */}
+          <div style={row}>
+            <label style={labelStyle}>Posted Video Link (TikTok / Instagram)</label>
+            <div style={{ position: 'relative' }}>
+              <input ref={videoLinkRef} defaultValue={data.videoLink || ''} placeholder="https://www.tiktok.com/... or https://www.instagram.com/reel/..." style={{ ...inputBase, paddingRight: 36 }} />
+              {data.videoLink && <a href={data.videoLink} target="_blank" rel="noopener noreferrer"
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#6366f1' }}>
+                <ExternalLink size={13} />
+              </a>}
+            </div>
           </div>
 
           {/* Type + Editor */}

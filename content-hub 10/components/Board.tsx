@@ -46,7 +46,7 @@ export default function Board({ pipeline, cards, users, onCardsChange, onCardSav
       id: generateId(), title: 'New card', stageId, pipelineId: pipeline.id,
       type: 'Top of Funnel', editor: '', format: '', scheduledDate: '', cost: '',
       headline: '', rawFileLink: '', referenceLink: '', frameLink: '',
-      musicLink: '', idea: '', hook: '', body: '', thumbnail: '',
+      musicLink: '', videoLink: '', idea: '', hook: '', body: '', thumbnail: '',
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     onCardsChange([...cards, newCard]);
@@ -135,6 +135,7 @@ export default function Board({ pipeline, cards, users, onCardsChange, onCardSav
         <CardModal
           card={selectedCard}
           users={users}
+          pipeline={pipeline}
           onSave={(updated) => { onCardSave(updated); setSelectedCard(null); }}
           onDelete={(id) => { onCardDelete(id); setSelectedCard(null); }}
           onClose={() => setSelectedCard(null)}

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutGrid, Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users } from 'lucide-react';
+import { LayoutGrid, Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3 } from 'lucide-react';
 import { AppState, ContentCard, Pipeline } from '@/lib/types';
 import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey } from '@/lib/store';
 import Board from '@/components/Board';
@@ -10,11 +10,13 @@ import PipelineSettings from '@/components/PipelineSettings';
 import Insights from '@/components/Insights';
 import YoutubeRoadmap from '@/components/YoutubeRoadmap';
 import InspirationProfiles from '@/components/InspirationProfiles';
+import ShortformGrid from '@/components/ShortformGrid';
 
 type View =
   | { type: 'insights' }
   | { type: 'pipeline'; id: string }
   | { type: 'roadmap'; pipelineId: string }
+  | { type: 'grid'; pipelineId: string }
   | { type: 'music' }
   | { type: 'footage' }
   | { type: 'inspiration' }
@@ -28,11 +30,11 @@ function getPipelineIcon(name: string) {
 }
 
 const isYoutube = (name: string) => name.toLowerCase().includes('youtube') || name.toLowerCase().includes('yt');
+const isShortform = (name: string) => name.toLowerCase().includes('short') || name.toLowerCase().includes('reel') || name.toLowerCase().includes('tiktok');
 
 export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [view, setView] = useState<View>({ type: 'insights' });
 
   useEffect(() => {
@@ -42,7 +44,6 @@ export default function Home() {
     });
   }, []);
 
-  // Cards handlers
   const handleCardsChange = useCallback(async (newCards: ContentCard[], changedCard?: ContentCard, deletedId?: string) => {
     setState(prev => prev ? { ...prev, cards: newCards } : prev);
     if (deletedId) {
@@ -62,20 +63,16 @@ export default function Home() {
     await deleteCard(id);
   }, []);
 
-  // Board cards change (drag/add)
   const handleBoardCardsChange = useCallback(async (newCards: ContentCard[]) => {
     if (!state) return;
-    // Find what changed
     const oldCards = state.cards;
     setState(prev => prev ? { ...prev, cards: newCards } : prev);
-    // Save changed cards
     for (const card of newCards) {
       const old = oldCards.find(c => c.id === card.id);
       if (!old || old.stageId !== card.stageId || old.title !== card.title) {
         await saveCard(card);
       }
     }
-    // Delete removed cards
     for (const old of oldCards) {
       if (!newCards.find(c => c.id === old.id)) {
         await deleteCard(old.id);
@@ -83,13 +80,11 @@ export default function Home() {
     }
   }, [state]);
 
-  // Pipelines
   const handlePipelinesChange = useCallback(async (pipelines: Pipeline[]) => {
     setState(prev => prev ? { ...prev, pipelines } : prev);
     await savePipelines(pipelines);
   }, []);
 
-  // Workspace
   const handleMusicChange = useCallback(async (musicBank: any[]) => {
     setState(prev => prev ? { ...prev, musicBank } : prev);
     await saveWorkspaceKey('music_bank', musicBank);
@@ -114,7 +109,7 @@ export default function Home() {
 
   if (!state) return null;
 
-  const activePipeline = (view.type === 'pipeline' || view.type === 'roadmap')
+  const activePipeline = (view.type === 'pipeline' || view.type === 'roadmap' || view.type === 'grid')
     ? state.pipelines.find(p => p.id === ((view as any).id || (view as any).pipelineId))
     : null;
 
@@ -137,6 +132,7 @@ export default function Home() {
     if (view.type === 'insights') return 'Main Insights';
     if (view.type === 'pipeline') return activePipeline?.name || '';
     if (view.type === 'roadmap') return 'Video Roadmap';
+    if (view.type === 'grid') return `${activePipeline?.name || 'Shortform'} Grid`;
     if (view.type === 'music') return 'Music Bank';
     if (view.type === 'footage') return 'Footage Links';
     if (view.type === 'inspiration') return 'Inspiration Profiles';
@@ -147,6 +143,7 @@ export default function Home() {
     if (view.type === 'insights') return 'Overview';
     if (view.type === 'pipeline') return 'Pipeline';
     if (view.type === 'roadmap') return 'YouTube';
+    if (view.type === 'grid') return 'Shortform';
     if (view.type === 'music' || view.type === 'footage') return 'Workspace';
     if (view.type === 'inspiration') return 'Research';
     return 'Admin';
@@ -161,7 +158,7 @@ export default function Home() {
       title: 'New card', stageId: firstStage.id, pipelineId: activePipeline.id,
       type: 'Top of Funnel', editor: '', format: '', scheduledDate: '', cost: '',
       headline: '', rawFileLink: '', referenceLink: '', frameLink: '', musicLink: '',
-      idea: '', hook: '', body: '', thumbnail: '',
+      videoLink: '', idea: '', hook: '', body: '', thumbnail: '',
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     setState(prev => prev ? { ...prev, cards: [...prev.cards, newCard] } : prev);
@@ -193,6 +190,7 @@ export default function Home() {
             <div key={p.id}>
               {navItem(p.name, getPipelineIcon(p.name), view.type === 'pipeline' && (view as any).id === p.id, () => setView({ type: 'pipeline', id: p.id }))}
               {isYoutube(p.name) && navItem('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => setView({ type: 'roadmap', pipelineId: p.id }), true)}
+              {(isShortform(p.name) || (!isYoutube(p.name) && !p.name.toLowerCase().includes('stor'))) && navItem('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => setView({ type: 'grid', pipelineId: p.id }), true)}
             </div>
           ))}
 
@@ -255,6 +253,17 @@ export default function Home() {
 
           {view.type === 'roadmap' && activePipeline && (
             <YoutubeRoadmap
+              pipeline={activePipeline}
+              cards={state.cards}
+              users={state.users}
+              onCardsChange={handleBoardCardsChange}
+              onCardSave={handleCardSave}
+              onCardDelete={handleCardDelete}
+            />
+          )}
+
+          {view.type === 'grid' && activePipeline && (
+            <ShortformGrid
               pipeline={activePipeline}
               cards={state.cards}
               users={state.users}

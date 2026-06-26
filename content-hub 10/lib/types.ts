@@ -15,6 +15,7 @@ export interface ContentCard {
   referenceLink: string;
   frameLink: string;
   musicLink: string;
+  videoLink: string;
   idea: string;
   hook: string;
   body: string;
