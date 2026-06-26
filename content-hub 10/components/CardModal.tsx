@@ -1,7 +1,8 @@
 'use client';
-import { useState, useRef } from 'react';
-import { X, ExternalLink, Trash2, Copy, Upload, Image, CheckCircle2, ExternalLink as LinkIcon } from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
+import { X, ExternalLink, Trash2, Copy, Upload, Image, CheckCircle2, Loader2 } from 'lucide-react';
 import { ContentCard, CardType, Pipeline } from '@/lib/types';
+import { fetchVideoThumbnail, isVideoLink } from '@/lib/thumbnail';
 
 interface Props {
   card: ContentCard;
@@ -19,16 +20,16 @@ const inputBase: React.CSSProperties = {
   borderRadius: 8, padding: '10px 12px', color: '#e2e8f0', fontSize: 14,
   outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
 };
-
 const labelStyle: React.CSSProperties = {
   fontSize: 11, fontWeight: 600, color: '#64748b',
   textTransform: 'uppercase', letterSpacing: '0.08em',
 };
-
 const row: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 
 export default function CardModal({ card, users, pipeline, onSave, onDelete, onClose }: Props) {
   const [data, setData] = useState<ContentCard>({ ...card });
+  const [fetchingThumb, setFetchingThumb] = useState(false);
+  const [thumbFetchFailed, setThumbFetchFailed] = useState(false);
 
   const titleRef = useRef<HTMLInputElement>(null);
   const formatRef = useRef<HTMLInputElement>(null);
@@ -43,6 +44,43 @@ export default function CardModal({ card, users, pipeline, onSave, onDelete, onC
   const hookRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const tryFetchThumbnail = useCallback(async (url: string) => {
+    if (!url || !isVideoLink(url)) return;
+    setFetchingThumb(true);
+    setThumbFetchFailed(false);
+    const thumbUrl = await fetchVideoThumbnail(url);
+    setFetchingThumb(false);
+    if (thumbUrl) {
+      setData(prev => ({ ...prev, thumbnail: thumbUrl, videoLink: url }));
+    } else {
+      setThumbFetchFailed(true);
+      setData(prev => ({ ...prev, videoLink: url }));
+    }
+  }, []);
+
+  const handleVideoLinkBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const url = e.target.value.trim();
+    if (!url || url === data.videoLink) return;
+    setData(prev => ({ ...prev, videoLink: url }));
+    if (!data.thumbnail) {
+      // Only auto-fetch if no thumbnail yet
+      await tryFetchThumbnail(url);
+    } else {
+      setData(prev => ({ ...prev, videoLink: url }));
+    }
+  };
+
+  const handleVideoLinkPaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const url = e.clipboardData.getData('text').trim();
+    if (!url || !isVideoLink(url)) return;
+    // Small delay to let the input value update
+    setTimeout(async () => {
+      if (!data.thumbnail) {
+        await tryFetchThumbnail(url);
+      }
+    }, 100);
+  };
 
   const handleThumbnailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,9 +122,9 @@ export default function CardModal({ card, users, pipeline, onSave, onDelete, onC
   };
 
   const currentStage = pipeline?.stages.find(s => s.id === data.stageId);
-  const isApproved = currentStage?.name.toLowerCase().includes('approved') || 
-                     currentStage?.name.toLowerCase().includes('green') ||
-                     currentStage?.name.toLowerCase().includes('posted');
+  const isApproved = currentStage?.name.toLowerCase().includes('approved') ||
+    currentStage?.name.toLowerCase().includes('green') ||
+    currentStage?.name.toLowerCase().includes('posted');
 
   return (
     <div
@@ -107,44 +145,26 @@ export default function CardModal({ card, users, pipeline, onSave, onDelete, onC
         {/* Quick Actions Bar */}
         {pipeline && (
           <div style={{ padding: '12px 24px', borderBottom: '1px solid #1e2130', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {/* Pipeline Status Selector */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Stage</span>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {pipeline.stages.map(stage => (
-                  <button
-                    key={stage.id}
-                    onClick={() => setData(prev => ({ ...prev, stageId: stage.id }))}
-                    style={{
-                      padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                      border: `1px solid ${data.stageId === stage.id ? stage.color : '#2d3148'}`,
-                      background: data.stageId === stage.id ? `${stage.color}22` : 'transparent',
-                      color: data.stageId === stage.id ? stage.color : '#64748b',
-                      cursor: 'pointer', transition: 'all 0.15s',
-                    }}
-                  >
-                    {stage.name}
-                  </button>
-                ))}
-              </div>
+            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>Stage</span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+              {pipeline.stages.map(stage => (
+                <button key={stage.id} onClick={() => setData(prev => ({ ...prev, stageId: stage.id }))}
+                  style={{
+                    padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                    border: `1px solid ${data.stageId === stage.id ? stage.color : '#2d3148'}`,
+                    background: data.stageId === stage.id ? `${stage.color}22` : 'transparent',
+                    color: data.stageId === stage.id ? stage.color : '#64748b',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}>{stage.name}</button>
+              ))}
             </div>
-
-            {/* Approve Button */}
-            {!isApproved && (
-              <button
-                onClick={handleApprove}
-                style={{
-                  marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
-                  background: '#15803d22', border: '1px solid #16a34a',
-                  color: '#22c55e', borderRadius: 8, padding: '6px 14px',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                }}
-              >
+            {!isApproved ? (
+              <button onClick={handleApprove}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#15803d22', border: '1px solid #16a34a', color: '#22c55e', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
                 <CheckCircle2 size={14} /> Approve Idea
               </button>
-            )}
-            {isApproved && (
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: '#22c55e', fontSize: 12, fontWeight: 600 }}>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#22c55e', fontSize: 12, fontWeight: 600 }}>
                 <CheckCircle2 size={14} /> Approved
               </div>
             )}
@@ -153,100 +173,95 @@ export default function CardModal({ card, users, pipeline, onSave, onDelete, onC
 
         <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* Thumbnail + Video Preview side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: data.videoLink ? '1fr 1fr' : '1fr', gap: 16 }}>
-            <div style={row}>
-              <label style={labelStyle}>Thumbnail</label>
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  width: '100%', height: 160, borderRadius: 10, border: '1px dashed #2d3148',
-                  background: '#1a1d26', cursor: 'pointer', overflow: 'hidden', position: 'relative',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'border-color 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = '#6366f1')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = '#2d3148')}
-              >
-                {data.thumbnail ? (
-                  <>
-                    <img src={data.thumbnail} alt="thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{
-                      position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      opacity: 0, transition: 'opacity 0.15s',
-                    }}
-                      onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                      onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
-                    >
-                      <span style={{ color: '#fff', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Upload size={14} /> Replace
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#475569' }}>
-                    <Image size={28} />
-                    <span style={{ fontSize: 13 }}>Click to upload thumbnail</span>
-                    <span style={{ fontSize: 11, color: '#334155' }}>PNG, JPG, WEBP</span>
-                  </div>
-                )}
-              </div>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleThumbnailUpload} style={{ display: 'none' }} />
-              {data.thumbnail && (
-                <button onClick={() => setData(prev => ({ ...prev, thumbnail: '' }))}
-                  style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', padding: 0 }}>
-                  Remove thumbnail
-                </button>
+          {/* Video Link — FIRST so thumbnail auto-fetches before showing image area */}
+          <div style={row}>
+            <label style={labelStyle}>
+              Posted Video Link (TikTok / Instagram)
+              {fetchingThumb && (
+                <span style={{ marginLeft: 8, color: '#6366f1', fontSize: 10, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> fetching thumbnail...
+                </span>
+              )}
+              {thumbFetchFailed && !fetchingThumb && (
+                <span style={{ marginLeft: 8, color: '#f59e0b', fontSize: 10, fontWeight: 500 }}>
+                  couldn't auto-fetch — upload manually below
+                </span>
+              )}
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                ref={videoLinkRef}
+                defaultValue={data.videoLink || ''}
+                placeholder="Paste TikTok or Instagram link — thumbnail loads automatically"
+                style={{ ...inputBase, paddingRight: 36 }}
+                onBlur={handleVideoLinkBlur}
+                onPaste={handleVideoLinkPaste}
+              />
+              {data.videoLink && (
+                <a href={data.videoLink} target="_blank" rel="noopener noreferrer"
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#6366f1' }}>
+                  <ExternalLink size={13} />
+                </a>
               )}
             </div>
-
-            {data.videoLink && (
-              <div style={row}>
-                <label style={labelStyle}>Video Preview</label>
-                <a
-                  href={data.videoLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    width: '100%', height: 160, borderRadius: 10, border: '1px solid #2d3148',
-                    background: 'linear-gradient(135deg, #1a1d26, #13151e)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    textDecoration: 'none', gap: 8, cursor: 'pointer',
-                  }}
-                >
-                  {data.thumbnail ? (
-                    <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 10, overflow: 'hidden' }}>
-                      <img src={data.thumbnail} alt="video" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} />
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                        <div style={{ width: 40, height: 40, background: 'rgba(99,102,241,0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span style={{ color: '#fff', fontSize: 16 }}>▶</span>
-                        </div>
-                        <span style={{ color: '#fff', fontSize: 12, fontWeight: 600, background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 6 }}>Open Video</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <LinkIcon size={24} color="#6366f1" />
-                      <span style={{ color: '#6366f1', fontSize: 13, fontWeight: 600 }}>Open Video</span>
-                      <span style={{ color: '#475569', fontSize: 11 }}>{data.videoLink.includes('tiktok') ? 'TikTok' : data.videoLink.includes('instagram') ? 'Instagram' : 'External Link'}</span>
-                    </>
-                  )}
-                </a>
-              </div>
+            {data.videoLink && data.thumbnail && (
+              <button
+                onClick={async () => {
+                  const url = videoLinkRef.current?.value || data.videoLink;
+                  if (url) await tryFetchThumbnail(url);
+                }}
+                style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#6366f1', fontSize: 12, cursor: 'pointer', padding: 0 }}
+              >
+                ↺ Re-fetch thumbnail
+              </button>
             )}
           </div>
 
-          {/* Video Link */}
+          {/* Thumbnail */}
           <div style={row}>
-            <label style={labelStyle}>Posted Video Link (TikTok / Instagram)</label>
-            <div style={{ position: 'relative' }}>
-              <input ref={videoLinkRef} defaultValue={data.videoLink || ''} placeholder="https://www.tiktok.com/... or https://www.instagram.com/reel/..." style={{ ...inputBase, paddingRight: 36 }} />
-              {data.videoLink && <a href={data.videoLink} target="_blank" rel="noopener noreferrer"
-                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#6366f1' }}>
-                <ExternalLink size={13} />
-              </a>}
+            <label style={labelStyle}>Thumbnail</label>
+            <div
+              onClick={() => !fetchingThumb && fileInputRef.current?.click()}
+              style={{
+                width: '100%', height: 200, borderRadius: 10, border: `1px dashed ${fetchingThumb ? '#6366f1' : '#2d3148'}`,
+                background: '#1a1d26', cursor: fetchingThumb ? 'wait' : 'pointer', overflow: 'hidden', position: 'relative',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'border-color 0.15s',
+              }}
+              onMouseEnter={e => !fetchingThumb && (e.currentTarget.style.borderColor = '#6366f1')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = fetchingThumb ? '#6366f1' : '#2d3148')}
+            >
+              {fetchingThumb ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: '#6366f1' }}>
+                  <div style={{ width: 32, height: 32, border: '3px solid #6366f133', borderTop: '3px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Fetching thumbnail from video...</span>
+                </div>
+              ) : data.thumbnail ? (
+                <>
+                  <img src={data.thumbnail} alt="thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '0')}>
+                    <span style={{ color: '#fff', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Upload size={14} /> Replace
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#475569' }}>
+                  <Image size={28} />
+                  <span style={{ fontSize: 13 }}>Paste a video link above to auto-load</span>
+                  <span style={{ fontSize: 11, color: '#334155' }}>or click here to upload manually</span>
+                </div>
+              )}
             </div>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleThumbnailUpload} style={{ display: 'none' }} />
+            {data.thumbnail && !fetchingThumb && (
+              <button onClick={() => setData(prev => ({ ...prev, thumbnail: '' }))}
+                style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#ef4444', fontSize: 12, cursor: 'pointer', padding: 0 }}>
+                Remove thumbnail
+              </button>
+            )}
           </div>
 
           {/* Type + Editor */}
@@ -350,6 +365,8 @@ export default function CardModal({ card, users, pipeline, onSave, onDelete, onC
           </button>
         </div>
       </div>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

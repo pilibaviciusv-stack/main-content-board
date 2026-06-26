@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pipeline, ContentCard, CardType } from '@/lib/types';
 import CardModal from './CardModal';
 import { Plus, CheckCircle2, ExternalLink, Grid3x3 } from 'lucide-react';
+import { fetchVideoThumbnail, isVideoLink } from '@/lib/thumbnail';
 
 interface Props {
   pipeline: Pipeline;
@@ -207,6 +208,28 @@ function VideoCard({
 export default function ShortformGrid({ pipeline, cards, users, onCardsChange, onCardSave, onCardDelete }: Props) {
   const [selectedCard, setSelectedCard] = useState<ContentCard | null>(null);
   const [filterType, setFilterType] = useState<CardType | 'all'>('all');
+
+  // Auto-fetch thumbnails for cards that have a videoLink but no thumbnail
+  useEffect(() => {
+    const cardsNeedingThumb = cards.filter(
+      c => c.pipelineId === pipeline.id && c.videoLink && !c.thumbnail && isVideoLink(c.videoLink)
+    );
+    if (cardsNeedingThumb.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      for (const card of cardsNeedingThumb) {
+        if (cancelled) break;
+        const thumbUrl = await fetchVideoThumbnail(card.videoLink);
+        if (thumbUrl && !cancelled) {
+          const updated = { ...card, thumbnail: thumbUrl, updatedAt: new Date().toISOString() };
+          onCardSave(updated);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeline.id]);
   const [filterStage, setFilterStage] = useState<string>('all');
   const [search, setSearch] = useState('');
 
