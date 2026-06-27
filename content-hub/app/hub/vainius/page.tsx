@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp, Home, ArrowLeft } from 'lucide-react';
 import { AppState, ContentCard, Pipeline } from '@/lib/types';
 import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey } from '@/lib/store';
@@ -12,9 +13,12 @@ import YoutubeRoadmap from '@/components/YoutubeRoadmap';
 import InspirationProfiles from '@/components/InspirationProfiles';
 import ShortformGrid from '@/components/ShortformGrid';
 import Analytics from '@/components/Analytics';
-import { useRouter } from 'next/navigation';
 
 const HUB = 'vainius';
+const HUB_EMOJI = '⚡';
+const HUB_NAME = 'Vainius';
+const HUB_DESC = 'PlugInfo Agency';
+const HUB_ACCENT = '#e11d48';
 
 type View =
   | { type: 'insights' }
@@ -37,7 +41,7 @@ function getPipelineIcon(name: string) {
 const isYoutube = (name: string) => name.toLowerCase().includes('youtube') || name.toLowerCase().includes('yt');
 const isShortform = (name: string) => name.toLowerCase().includes('short') || name.toLowerCase().includes('reel') || name.toLowerCase().includes('tiktok');
 
-export default function Home() {
+export default function VainiusHub() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ type: 'insights' });
@@ -45,63 +49,71 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    loadState(HUB).then(s => { setState(s); setLoading(false); });
-  }, []);
-
-  const handleCardsChange = useCallback(async (newCards: ContentCard[], changedCard?: ContentCard, deletedId?: string) => {
-    setState(prev => prev ? { ...prev, cards: newCards } : prev);
-    if (deletedId) await deleteCard(deletedId);
-    else if (changedCard) await saveCard(changedCard, HUB);
+    loadState(HUB).then((s: AppState) => { setState(s); setLoading(false); });
   }, []);
 
   const handleCardSave = useCallback(async (card: ContentCard) => {
-    setState(prev => prev ? { ...prev, cards: prev.cards.map(c => c.id === card.id ? card : c) } : prev);
+    setState((prev: AppState | null) => prev ? { ...prev, cards: prev.cards.map((c: ContentCard) => c.id === card.id ? card : c) } : prev);
     await saveCard(card, HUB);
   }, []);
 
   const handleCardDelete = useCallback(async (id: string) => {
-    setState(prev => prev ? { ...prev, cards: prev.cards.filter(c => c.id !== id) } : prev);
+    setState((prev: AppState | null) => prev ? { ...prev, cards: prev.cards.filter((c: ContentCard) => c.id !== id) } : prev);
     await deleteCard(id);
   }, []);
 
   const handleBoardCardsChange = useCallback(async (newCards: ContentCard[]) => {
     if (!state) return;
     const oldCards = state.cards;
-    setState(prev => prev ? { ...prev, cards: newCards } : prev);
+    setState((prev: AppState | null) => prev ? { ...prev, cards: newCards } : prev);
     for (const card of newCards) {
-      const old = oldCards.find(c => c.id === card.id);
+      const old = oldCards.find((c: ContentCard) => c.id === card.id);
       if (!old || old.stageId !== card.stageId || old.title !== card.title) await saveCard(card, HUB);
     }
     for (const old of oldCards) {
-      if (!newCards.find(c => c.id === old.id)) await deleteCard(old.id);
+      if (!newCards.find((c: ContentCard) => c.id === old.id)) await deleteCard(old.id);
     }
   }, [state]);
 
   const handlePipelinesChange = useCallback(async (pipelines: Pipeline[]) => {
-    setState(prev => prev ? { ...prev, pipelines } : prev);
+    setState((prev: AppState | null) => prev ? { ...prev, pipelines } : prev);
     await savePipelines(pipelines, HUB);
   }, []);
 
   const handleMusicChange = useCallback(async (musicBank: any[]) => {
-    setState(prev => prev ? { ...prev, musicBank } : prev);
+    setState((prev: AppState | null) => prev ? { ...prev, musicBank } : prev);
     await saveWorkspaceKey('music_bank', musicBank, HUB);
   }, []);
 
   const handleFootageChange = useCallback(async (footageLinks: any[]) => {
-    setState(prev => prev ? { ...prev, footageLinks } : prev);
+    setState((prev: AppState | null) => prev ? { ...prev, footageLinks } : prev);
     await saveWorkspaceKey('footage_links', footageLinks, HUB);
   }, []);
 
   const handleInspirationChange = useCallback(async (inspirationProfiles: any[]) => {
-    setState(prev => prev ? { ...prev, inspirationProfiles } : prev);
+    setState((prev: AppState | null) => prev ? { ...prev, inspirationProfiles } : prev);
     await saveWorkspaceKey('inspiration_profiles', inspirationProfiles, HUB);
   }, []);
 
   const navigate = (v: View) => { setView(v); setSidebarOpen(false); };
 
+  const addNewCard = (pipeline: Pipeline) => {
+    const firstStage = pipeline.stages[0];
+    if (!firstStage) return;
+    const newCard: ContentCard = {
+      id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
+      title: 'New card', stageId: firstStage.id, pipelineId: pipeline.id,
+      type: 'Top of Funnel', editor: '', format: '', scheduledDate: '', cost: '',
+      headline: '', rawFileLink: '', referenceLink: '', frameLink: '', musicLink: '',
+      videoLink: '', idea: '', hook: '', body: '', thumbnail: '',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    };
+    setState((prev: AppState | null) => prev ? { ...prev, cards: [...prev.cards, newCard] } : prev);
+    saveCard(newCard, HUB);
+  };
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0d0f14', flexDirection: 'column', gap: 16 }}>
-      <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: 10 }} />
       <div style={{ color: '#475569', fontSize: 14 }}>Loading...</div>
     </div>
   );
@@ -109,14 +121,14 @@ export default function Home() {
   if (!state) return null;
 
   const activePipeline = (view.type === 'pipeline' || view.type === 'roadmap' || view.type === 'grid')
-    ? state.pipelines.find(p => p.id === ((view as any).id || (view as any).pipelineId))
+    ? state.pipelines.find((p: Pipeline) => p.id === ((view as any).id || (view as any).pipelineId))
     : null;
 
   const totalCards = state.cards.length;
   const now = new Date();
-  const thisWeek = state.cards.filter(c => now.getTime() - new Date(c.updatedAt).getTime() < 7 * 24 * 60 * 60 * 1000).length;
+  const thisWeek = state.cards.filter((c: ContentCard) => now.getTime() - new Date(c.updatedAt).getTime() < 7 * 24 * 60 * 60 * 1000).length;
 
-  const navItem = (label: string, icon: React.ReactNode, active: boolean, onClick: () => void, sub = false) => (
+  const navBtn = (label: string, icon: React.ReactNode, active: boolean, onClick: () => void, sub = false) => (
     <button onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: 9,
       padding: sub ? '7px 12px 7px 28px' : '8px 12px',
@@ -139,23 +151,7 @@ export default function Home() {
     return 'Settings';
   };
 
-  const addNewCard = () => {
-    if (!activePipeline) return;
-    const firstStage = activePipeline.stages[0];
-    if (!firstStage) return;
-    const newCard: ContentCard = {
-      id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
-      title: 'New card', stageId: firstStage.id, pipelineId: activePipeline.id,
-      type: 'Top of Funnel', editor: '', format: '', scheduledDate: '', cost: '',
-      headline: '', rawFileLink: '', referenceLink: '', frameLink: '', musicLink: '',
-      videoLink: '', idea: '', hook: '', body: '', thumbnail: '',
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    };
-    setState(prev => prev ? { ...prev, cards: [...prev.cards, newCard] } : prev);
-    saveCard(newCard, HUB);
-  };
-
-  const SidebarContent = () => (
+  const sidebarInner = (
     <>
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #1e2130' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -165,32 +161,32 @@ export default function Home() {
             </span>
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>⚡ Vainius</div>
-            <div style={{ fontSize: 10, color: '#374151' }}>PlugInfo Agency</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>{HUB_EMOJI} {HUB_NAME}</div>
+            <div style={{ fontSize: 10, color: '#374151' }}>{HUB_DESC}</div>
           </div>
         </div>
       </div>
       <div style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
-        {navItem('Main Insights', <BarChart2 size={14} />, view.type === 'insights', () => navigate({ type: 'insights' }))}
-        {navItem('Analytics', <TrendingUp size={14} />, view.type === 'analytics', () => navigate({ type: 'analytics' }), true)}
+        {navBtn('Main Insights', <BarChart2 size={14} />, view.type === 'insights', () => navigate({ type: 'insights' }))}
+        {navBtn('Analytics', <TrendingUp size={14} />, view.type === 'analytics', () => navigate({ type: 'analytics' }), true)}
         <div style={{ height: 16 }} />
         <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pipelines</div>
-        {state.pipelines.map(p => (
+        {state.pipelines.map((p: Pipeline) => (
           <div key={p.id}>
-            {navItem(p.name, getPipelineIcon(p.name), view.type === 'pipeline' && (view as any).id === p.id, () => navigate({ type: 'pipeline', id: p.id }))}
-            {isYoutube(p.name) && navItem('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => navigate({ type: 'roadmap', pipelineId: p.id }), true)}
-            {(isShortform(p.name) || (!isYoutube(p.name) && !p.name.toLowerCase().includes('stor'))) && navItem('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)}
+            {navBtn(p.name, getPipelineIcon(p.name), view.type === 'pipeline' && (view as any).id === p.id, () => navigate({ type: 'pipeline', id: p.id }))}
+            {isYoutube(p.name) && navBtn('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => navigate({ type: 'roadmap', pipelineId: p.id }), true)}
+            {(isShortform(p.name) || (!isYoutube(p.name) && !p.name.toLowerCase().includes('stor'))) && navBtn('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)}
           </div>
         ))}
         <div style={{ marginTop: 16 }}>
           <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Workspace</div>
-          {navItem('Music Bank', <Music size={14} />, view.type === 'music', () => navigate({ type: 'music' }))}
-          {navItem('Footage Links', <Film size={14} />, view.type === 'footage', () => navigate({ type: 'footage' }))}
-          {navItem('Inspiration', <Users size={14} />, view.type === 'inspiration', () => navigate({ type: 'inspiration' }))}
+          {navBtn('Music Bank', <Music size={14} />, view.type === 'music', () => navigate({ type: 'music' }))}
+          {navBtn('Footage Links', <Film size={14} />, view.type === 'footage', () => navigate({ type: 'footage' }))}
+          {navBtn('Inspiration', <Users size={14} />, view.type === 'inspiration', () => navigate({ type: 'inspiration' }))}
         </div>
         <div style={{ marginTop: 16 }}>
           <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Admin</div>
-          {navItem('Pipelines', <Settings size={14} />, view.type === 'settings', () => navigate({ type: 'settings' }))}
+          {navBtn('Pipelines', <Settings size={14} />, view.type === 'settings', () => navigate({ type: 'settings' }))}
         </div>
       </div>
       <div style={{ padding: '12px 16px', borderTop: '1px solid #1e2130' }}>
@@ -200,7 +196,7 @@ export default function Home() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 11, color: '#475569' }}>Active this week</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#6366f1' }}>{thisWeek}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: HUB_ACCENT }}>{thisWeek}</span>
         </div>
       </div>
     </>
@@ -209,48 +205,44 @@ export default function Home() {
   return (
     <div className="hub-layout" style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#0d0f14' }}>
 
-      {/* Mobile overlay sidebar */}
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex' }}>
           <div style={{ position: 'absolute', inset: 0, background: '#000000aa' }} onClick={() => setSidebarOpen(false)} />
-          <div style={{ width: 260, background: '#0a0c11', borderRight: '1px solid #1e2130', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1, height: '100%', overflowY: 'auto' }}>
-            <SidebarContent />
+          <div style={{ width: 260, background: '#0a0c11', borderRight: '1px solid #1e2130', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1, height: '100%' }}>
+            {sidebarInner}
           </div>
         </div>
       )}
 
       {/* Desktop sidebar */}
       <div className="hub-sidebar" style={{ width: 220, background: '#0a0c11', borderRight: '1px solid #1e2130', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <SidebarContent />
+        {sidebarInner}
       </div>
 
       {/* Main */}
       <div className="hub-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="hub-header" style={{ padding: '16px 24px', borderBottom: '1px solid #1e2130', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Hamburger — mobile only */}
-            <button onClick={() => setSidebarOpen(true)}
-              style={{ display: 'none', background: 'none', border: '1px solid #1e2130', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: '#64748b' }}
-              className="mobile-menu-btn">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={() => setSidebarOpen(true)} className="mobile-menu-btn"
+              style={{ display: 'none', background: 'none', border: '1px solid #1e2130', borderRadius: 7, padding: '5px 9px', cursor: 'pointer', color: '#64748b', fontSize: 16 }}>
               ☰
             </button>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#e2e8f0' }}>{getTitle()}</h1>
-            </div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#e2e8f0' }}>{getTitle()}</h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {view.type === 'pipeline' && activePipeline && (
               <>
-                <span style={{ fontSize: 12, color: '#475569' }}>{state.cards.filter(c => c.pipelineId === activePipeline.id).length} cards</span>
-                <button onClick={addNewCard}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                <span style={{ fontSize: 12, color: '#475569' }}>{state.cards.filter((c: ContentCard) => c.pipelineId === activePipeline.id).length} cards</span>
+                <button onClick={() => addNewCard(activePipeline)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: HUB_ACCENT, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
                   <Plus size={15} /> New
                 </button>
               </>
             )}
             <button onClick={() => router.push('/')}
               style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid #1e2130', borderRadius: 7, padding: '6px 10px', color: '#4b5563', cursor: 'pointer', fontSize: 12 }}>
-              <ArrowLeft size={12} />
+              <ArrowLeft size={13} />
             </button>
           </div>
         </div>
@@ -279,29 +271,25 @@ export default function Home() {
 
       {/* Mobile bottom nav */}
       <nav className="hub-mobile-nav">
-        <button className={`hub-mobile-nav-btn ${view.type === 'insights' ? 'active' : ''}`} onClick={() => navigate({ type: 'insights' })}>
-          <Home size={18} /> Home
+        <button className={`hub-mobile-nav-btn${view.type === 'insights' ? ' active' : ''}`} onClick={() => navigate({ type: 'insights' })}>
+          <Home size={18} /><span>Home</span>
         </button>
-        {state.pipelines.slice(0, 2).map(p => (
-          <button key={p.id} className={`hub-mobile-nav-btn ${view.type === 'pipeline' && (view as any).id === p.id ? 'active' : ''}`}
+        {state.pipelines.slice(0, 2).map((p: Pipeline) => (
+          <button key={p.id} className={`hub-mobile-nav-btn${view.type === 'pipeline' && (view as any).id === p.id ? ' active' : ''}`}
             onClick={() => navigate({ type: 'pipeline', id: p.id })}>
             {isYoutube(p.name) ? <PlaySquare size={18} /> : <Video size={18} />}
-            {p.name.length > 7 ? p.name.slice(0, 7) + '…' : p.name}
+            <span>{p.name.length > 6 ? p.name.slice(0, 6) + '…' : p.name}</span>
           </button>
         ))}
-        <button className={`hub-mobile-nav-btn ${view.type === 'analytics' ? 'active' : ''}`} onClick={() => navigate({ type: 'analytics' })}>
-          <TrendingUp size={18} /> Stats
+        <button className={`hub-mobile-nav-btn${view.type === 'analytics' ? ' active' : ''}`} onClick={() => navigate({ type: 'analytics' })}>
+          <TrendingUp size={18} /><span>Stats</span>
         </button>
-        <button className={`hub-mobile-nav-btn`} onClick={() => setSidebarOpen(true)}>
-          <Settings size={18} /> More
+        <button className="hub-mobile-nav-btn" onClick={() => setSidebarOpen(true)}>
+          <Settings size={18} /><span>More</span>
         </button>
       </nav>
 
-      <style>{`
-        @media (max-width: 768px) {
-          .mobile-menu-btn { display: flex !important; }
-        }
-      `}</style>
+      <style>{`@media(max-width:768px){.mobile-menu-btn{display:flex!important}}`}</style>
     </div>
   );
 }
