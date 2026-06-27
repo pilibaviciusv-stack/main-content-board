@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, TrendingDown, RefreshCw, AlertTriangle, Eye, ThumbsUp, MessageCircle, ChevronDown, ChevronUp, ExternalLink, Zap } from 'lucide-react';
 
 const YtIcon = () => (
@@ -317,18 +317,17 @@ export default function Analytics({ cards }: Props) {
   const [filterPlatform, setFilterPlatform] = useState<'all' | 'instagram'>('all');
 
   // Match videos to pipeline cards by URL or title to get funnel type
+  const cardsRef = React.useRef(cards);
+  cardsRef.current = cards;
+
   const enrichWithFunnelType = useCallback((vids: VideoStat[]): VideoStat[] => {
     return vids.map(v => {
-      // Try to match with cards by videoLink or title similarity
-      const matchedCard = cards.find(c => {
+      const matchedCard = cardsRef.current.find(c => {
         if (c.videoLink && v.url) {
           const cvid = c.videoLink.toLowerCase();
-          const vvid = v.url.toLowerCase();
-          // Match by video ID in URL
           if (v.id && cvid.includes(v.id)) return true;
-          if (cvid === vvid) return true;
+          if (cvid === v.url.toLowerCase()) return true;
         }
-        // Fuzzy title match
         if (c.title && v.title) {
           const ct = c.title.toLowerCase().trim();
           const vt = v.title.toLowerCase().trim();
@@ -336,15 +335,13 @@ export default function Analytics({ cards }: Props) {
         }
         return false;
       });
-
       let funnelType: 'TOF' | 'MOF' | 'BOF' | null = null;
       if (matchedCard?.type === 'Top of Funnel') funnelType = 'TOF';
       else if (matchedCard?.type === 'Middle of Funnel') funnelType = 'MOF';
       else if (matchedCard?.type === 'Bottom of Funnel') funnelType = 'BOF';
-
       return { ...v, funnelType };
     });
-  }, [cards]);
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -366,10 +363,7 @@ export default function Analytics({ cards }: Props) {
         if (data.error && !data.instagram?.length) {
           setError(data.error);
         } else {
-          const all = [
-            ...(data.instagram || []),
-          ];
-          setVideos(enrichWithFunnelType(all));
+          setVideos(enrichWithFunnelType(data.instagram || []));
           setLastScraped(data.scrapedAt || '');
         }
       }
@@ -381,7 +375,7 @@ export default function Analytics({ cards }: Props) {
 
   useEffect(() => {
     loadData();
-  }, [platform]);
+  }, [loadData]);
 
   // Filtered + sorted videos
   const filteredVideos = videos.filter(v => {
