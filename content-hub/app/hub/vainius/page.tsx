@@ -184,7 +184,7 @@ export default function VainiusHub() {
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>⚡ Vainius</div>
-              <div style={{ fontSize: 10, color: '#374151' }}>Vabanque Agency</div>
+              <div style={{ fontSize: 10, color: '#374151' }}>PlugInfo Agency</div>
             </div>
           </div>
         </div>

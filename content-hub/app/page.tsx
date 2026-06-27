@@ -16,7 +16,7 @@ type HubMeta = {
 
 const DEFAULT_HUBS: HubMeta[] = [
   { slug: 'danas', label: 'Danas', desc: 'Organic AI Dropshipping', logo: '🌿', accentColor: '#22c55e' },
-  { slug: 'vainius', label: 'Vainius', desc: 'Vabanque Agency', logo: '⚡', accentColor: '#e11d48' },
+  { slug: 'vainius', label: 'Vainius', desc: 'PlugInfo Agency', logo: '⚡', accentColor: '#e11d48' },
   { slug: 'joris', label: 'Joris', desc: 'Content Strategy', logo: '🎯', accentColor: '#e11d48' },
 ];
 
@@ -126,7 +126,7 @@ export default function LandingPage() {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>Content Hub</div>
-            <div style={{ fontSize: 10, color: '#374151', fontWeight: 500 }}>Vabanque</div>
+            <div style={{ fontSize: 10, color: '#374151', fontWeight: 500 }}>PlugInfo</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -292,7 +292,7 @@ export default function LandingPage() {
       {/* Footer */}
       <div style={{ padding: '16px 32px', borderTop: '1px solid #18191f', display: 'flex', justifyContent: 'center' }}>
         <span style={{ fontSize: 10, color: '#1f2937', fontFamily: 'monospace' }}>
-          <span style={{ color: '#e11d4844' }}>[PI]</span> PlugInfo · Vabanque
+          <span style={{ color: '#e11d4844' }}>[PI]</span> PlugInfo · PlugInfo
         </span>
       </div>
     </div>
