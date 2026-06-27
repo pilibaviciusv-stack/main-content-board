@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase';
 import { LayoutGrid, Lock, LogOut, Clock } from 'lucide-react';
 
 type HubAccess = { hub_slug: string; status: string };
-type Profile = { full_name: string; role: string };
 
 const HUBS = [
   { slug: 'danas', label: 'Danas', emoji: '🌿', desc: 'Organic AI Dropshipping' },
@@ -14,7 +13,8 @@ const HUBS = [
 ];
 
 export default function LandingPage() {
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [userName, setUserName] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [access, setAccess] = useState<HubAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState<string | null>(null);
@@ -22,30 +22,40 @@ export default function LandingPage() {
 
   useEffect(() => {
     const load = async () => {
+      // Get session first
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
 
-      const [{ data: prof }, { data: acc }] = await Promise.all([
-        supabase.from('profiles').select('full_name, role').single(),
-        supabase.from('hub_access').select('hub_slug, status'),
+      // Use the session user id directly — no RLS issues
+      const userId = session.user.id;
+
+      // Fetch profile and access in parallel
+      const [profRes, accRes] = await Promise.all([
+        supabase.from('profiles').select('full_name, role').eq('id', userId).single(),
+        supabase.from('hub_access').select('hub_slug, status').eq('user_id', userId),
       ]);
 
-      setProfile(prof);
-      setAccess(acc || []);
+      setUserName(profRes.data?.full_name || session.user.email || '');
+      setIsAdmin(profRes.data?.role === 'admin');
+      setAccess(accRes.data || []);
       setLoading(false);
     };
     load();
-  }, []);
+  }, [router]);
 
   const getStatus = (slug: string) => {
-    if (profile?.role === 'admin') return 'unlocked';
+    if (isAdmin) return 'unlocked';
     return access.find(a => a.hub_slug === slug)?.status || 'locked';
   };
 
   const handleRequest = async (slug: string) => {
     setRequesting(slug);
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('hub_access').upsert({ user_id: user!.id, hub_slug: slug, status: 'pending' });
+    if (!user) return;
+    await supabase.from('hub_access').upsert(
+      { user_id: user.id, hub_slug: slug, status: 'pending' },
+      { onConflict: 'user_id,hub_slug' }
+    );
     setAccess(prev => [...prev.filter(a => a.hub_slug !== slug), { hub_slug: slug, status: 'pending' }]);
     setRequesting(null);
   };
@@ -62,6 +72,12 @@ export default function LandingPage() {
     </div>
   );
 
+  // Only show hubs the user has some access row for (or all if admin)
+  const visibleHubs = HUBS.filter(hub => {
+    if (isAdmin) return true;
+    return access.some(a => a.hub_slug === hub.slug);
+  });
+
   return (
     <div style={{ minHeight: '100vh', background: '#0d0f14', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
@@ -76,7 +92,10 @@ export default function LandingPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 13, color: '#64748b' }}>{profile?.full_name}</span>
+          <span style={{ fontSize: 13, color: '#64748b' }}>{userName}</span>
+          {isAdmin && (
+            <span style={{ fontSize: 11, background: '#1e1b4b', color: '#818cf8', borderRadius: 6, padding: '3px 8px', fontWeight: 600 }}>Admin</span>
+          )}
           <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: '1px solid #1e2130', borderRadius: 8, padding: '7px 12px', color: '#64748b', cursor: 'pointer', fontSize: 12 }}>
             <LogOut size={13} /> Sign out
           </button>
@@ -89,7 +108,7 @@ export default function LandingPage() {
         <p style={{ fontSize: 14, color: '#475569', margin: '0 0 48px', textAlign: 'center' }}>Select a hub to open</p>
 
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 800 }}>
-          {HUBS.map(hub => {
+          {visibleHubs.map(hub => {
             const status = getStatus(hub.slug);
             const isOpen = status === 'owner' || status === 'unlocked';
             const isPending = status === 'pending';
@@ -107,31 +126,16 @@ export default function LandingPage() {
               }}
                 onClick={() => isOpen && router.push(`/hub/${hub.slug}`)}
               >
-                {/* Status badge */}
-                {isOpen && (
-                  <div style={{ position: 'absolute', top: 12, right: 12, width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
-                )}
-                {isPending && (
-                  <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Clock size={11} color="#f59e0b" />
-                  </div>
-                )}
-                {isLocked && (
-                  <div style={{ position: 'absolute', top: 10, right: 10 }}>
-                    <Lock size={13} color="#475569" />
-                  </div>
-                )}
+                {isOpen && <div style={{ position: 'absolute', top: 12, right: 12, width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />}
+                {isPending && <div style={{ position: 'absolute', top: 10, right: 10 }}><Clock size={11} color="#f59e0b" /></div>}
+                {isLocked && <div style={{ position: 'absolute', top: 10, right: 10 }}><Lock size={13} color="#475569" /></div>}
 
                 <div style={{ fontSize: 36, marginBottom: 16 }}>{hub.emoji}</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{hub.label}</div>
                 <div style={{ fontSize: 12, color: '#475569', marginBottom: 20 }}>{hub.desc}</div>
 
-                {isOpen && (
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6366f1' }}>Open →</div>
-                )}
-                {isPending && (
-                  <div style={{ fontSize: 12, color: '#f59e0b' }}>Request pending</div>
-                )}
+                {isOpen && <div style={{ fontSize: 12, fontWeight: 600, color: '#6366f1' }}>Open →</div>}
+                {isPending && <div style={{ fontSize: 12, color: '#f59e0b' }}>Request pending</div>}
                 {isLocked && (
                   <button
                     onClick={e => { e.stopPropagation(); handleRequest(hub.slug); }}
