@@ -1,11 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const API_KEY = 'AIzaSyCvKYDqKXX-gF3NPBH3_YJmMs1Smdlt48Q';
-const CHANNEL_HANDLE = 'DanasBytautas';
 
-async function getChannelId(): Promise<string> {
+async function getChannelId(handle: string): Promise<string> {
   const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${CHANNEL_HANDLE}&key=${API_KEY}`,
+    `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${handle}&key=${API_KEY}`,
     { cache: 'no-store' }
   );
   const data = await res.json();
@@ -71,19 +70,10 @@ function parseDuration(iso: string): number {
 function isShortVideo(item: any, durationSec: number): boolean {
   const tags: string[] = item.snippet?.tags || [];
   const title: string = item.snippet?.title || '';
-  
-  // Explicit Shorts markers
   const hasShortTag = tags.some((t: string) => /^#?shorts?$/i.test(t));
   const titleHasShort = /\#shorts?/i.test(title);
-  
-  // Danas's shortform hashtags used consistently
-  const hasShortformTag = tags.some((t: string) => /dropshiperis|organikas/i.test(t)) ||
-    /\#dropshiperis|\#organikas/i.test(title);
-  
-  // Under 3 minutes = almost certainly a Short/vertical clip for this channel
   const shortDuration = durationSec > 0 && durationSec <= 180;
-  
-  return hasShortTag || titleHasShort || (shortDuration && hasShortformTag) || (durationSec > 0 && durationSec <= 180);
+  return hasShortTag || titleHasShort || shortDuration;
 }
 
 async function getVideoStats(videoIds: string[]) {
@@ -109,9 +99,25 @@ async function getVideoStats(videoIds: string[]) {
   return stats;
 }
 
-export async function GET() {
+function extractHandle(input: string): string {
+  // Accept: @handle, youtube.com/@handle, youtube.com/c/handle, youtube.com/channel/ID, or bare handle
+  const trimmed = input.trim();
+  const atMatch = trimmed.match(/youtube\.com\/@([^/?&\s]+)/i);
+  if (atMatch) return atMatch[1];
+  const cMatch = trimmed.match(/youtube\.com\/(?:c|user)\/([^/?&\s]+)/i);
+  if (cMatch) return cMatch[1];
+  // bare @handle
+  if (trimmed.startsWith('@')) return trimmed.slice(1);
+  return trimmed;
+}
+
+export async function GET(req: NextRequest) {
   try {
-    const channelId = await getChannelId();
+    const { searchParams } = new URL(req.url);
+    const rawHandle = searchParams.get('handle') || 'DanasBytautas';
+    const handle = extractHandle(rawHandle);
+
+    const channelId = await getChannelId(handle);
     if (!channelId) return NextResponse.json({ error: 'Channel not found', videos: [] });
 
     const [channelStats, rawVideos] = await Promise.all([

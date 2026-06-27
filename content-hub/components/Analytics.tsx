@@ -27,6 +27,8 @@ interface VideoStat {
 
 interface Props {
   cards: ContentCard[];
+  channelHandle?: string; // e.g. 'DanasBytautas' — if not set, show setup UI
+  hubSlug?: string; // e.g. 'danas', 'joris', 'vainius' — used to scope excluded videos
 }
 
 type Platform = 'youtube' | 'shortform';
@@ -381,7 +383,7 @@ function FunnelRow({ label, videos, color }: { label: string; videos: VideoStat[
   );
 }
 
-export default function Analytics({ cards }: Props) {
+export default function Analytics({ cards, channelHandle, hubSlug }: Props) {
   const [platform, setPlatform] = useState<Platform>('youtube');
   const [videos, setVideos] = useState<VideoStat[]>([]);
   const [channelInfo, setChannelInfo] = useState<any>(null);
@@ -392,32 +394,38 @@ export default function Analytics({ cards }: Props) {
   const [filterFunnel, setFilterFunnel] = useState<'ALL' | 'TOF' | 'MOF' | 'BOF' | 'UNKNOWN'>('ALL');
   const [filterPlatform, setFilterPlatform] = useState<'all' | 'instagram'>('all');
   const [excludedIds, setExcludedIds] = useState<string[]>([]);
+  // Setup state for hubs without a configured channel
+  const [setupInput, setSetupInput] = useState('');
+  const [confirmedHandle, setConfirmedHandle] = useState<string | null>(channelHandle || null);
 
   // Load excluded IDs on mount
   useEffect(() => {
-    fetch('/api/excluded-videos')
+    const slug = hubSlug || 'danas';
+    fetch(`/api/excluded-videos?hub=${slug}`)
       .then(r => r.json())
       .then(d => setExcludedIds(d.ids || []))
       .catch(() => {});
-  }, []);
+  }, [hubSlug]);
 
   const handleExclude = useCallback(async (id: string) => {
     setExcludedIds(prev => [...prev, id]);
-    await fetch('/api/excluded-videos', {
+    const slug = hubSlug || 'danas';
+    await fetch(`/api/excluded-videos?hub=${slug}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-  }, []);
+  }, [hubSlug]);
 
   const handleUnexclude = useCallback(async (id: string) => {
     setExcludedIds(prev => prev.filter(x => x !== id));
-    await fetch('/api/excluded-videos', {
+    const slug = hubSlug || 'danas';
+    await fetch(`/api/excluded-videos?hub=${slug}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-  }, []);
+  }, [hubSlug]);
 
   const cardsRef = React.useRef(cards);
   cardsRef.current = cards;
@@ -459,7 +467,8 @@ export default function Analytics({ cards }: Props) {
     setChannelInfo(null);
     try {
       if (platform === 'youtube') {
-        const res = await fetch('/api/scrape-youtube');
+        const handle = confirmedHandle || channelHandle || 'DanasBytautas';
+        const res = await fetch(`/api/scrape-youtube?handle=${encodeURIComponent(handle)}`);
         const data = await res.json();
         if (data.error && !data.videos?.length) {
           setError(data.error);
@@ -530,6 +539,52 @@ export default function Analytics({ cards }: Props) {
     cursor: 'pointer', fontSize: 11, fontWeight: active ? 700 : 500,
     transition: 'all 0.15s',
   });
+
+  // Setup screen — shown when no channel is configured yet
+  if (!confirmedHandle && platform === 'youtube') {
+    return (
+      <div style={{ color: '#e2e8f0' }}>
+        {/* Platform switcher */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => setPlatform('youtube')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, background: platform === 'youtube' ? '#ef444422' : '#13151e', color: platform === 'youtube' ? '#ef4444' : '#64748b', border: `1.5px solid ${platform === 'youtube' ? '#ef444455' : '#1e2130'}`, cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all 0.15s' }}>
+            <YtIcon /> YouTube
+          </button>
+          <button onClick={() => setPlatform('shortform')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, background: platform === 'shortform' ? '#e879f922' : '#13151e', color: platform === 'shortform' ? '#e879f9' : '#64748b', border: `1.5px solid ${platform === 'shortform' ? '#e879f955' : '#1e2130'}`, cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all 0.15s' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg> Shortform
+          </button>
+        </div>
+        {/* Channel setup card */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 360, gap: 24 }}>
+          <div style={{ width: 56, height: 56, background: '#ef444422', border: '1.5px solid #ef444455', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <YtIcon />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#e2e8f0', marginBottom: 8 }}>Connect a YouTube Channel</div>
+            <div style={{ fontSize: 13, color: '#475569', maxWidth: 380 }}>Paste your channel URL or handle and the analytics tab will be set up automatically.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 460 }}>
+            <input
+              value={setupInput}
+              onChange={e => setSetupInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && setupInput.trim()) {
+                  setConfirmedHandle(setupInput.trim());
+                }
+              }}
+              placeholder="youtube.com/@YourHandle or @YourHandle"
+              style={{ flex: 1, background: '#13151e', border: '1.5px solid #2d3348', borderRadius: 10, padding: '11px 14px', color: '#e2e8f0', fontSize: 13, outline: 'none' }}
+            />
+            <button
+              onClick={() => { if (setupInput.trim()) setConfirmedHandle(setupInput.trim()); }}
+              style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            >
+              Set up
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ color: '#e2e8f0' }}>

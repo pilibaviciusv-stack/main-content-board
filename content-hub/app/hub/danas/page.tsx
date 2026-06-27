@@ -40,7 +40,7 @@ export default function Home() {
   const [view, setView] = useState<View>({ type: 'insights' });
 
   useEffect(() => {
-    loadState().then(s => {
+    loadState('danas').then(s => {
       setState(s);
       setLoading(false);
     });
@@ -51,13 +51,13 @@ export default function Home() {
     if (deletedId) {
       await deleteCard(deletedId);
     } else if (changedCard) {
-      await saveCard(changedCard);
+      await saveCard(changedCard, 'danas');
     }
   }, []);
 
   const handleCardSave = useCallback(async (card: ContentCard) => {
     setState(prev => prev ? { ...prev, cards: prev.cards.map(c => c.id === card.id ? card : c) } : prev);
-    await saveCard(card);
+    await saveCard(card, 'danas');
   }, []);
 
   const handleCardDelete = useCallback(async (id: string) => {
@@ -72,7 +72,7 @@ export default function Home() {
     for (const card of newCards) {
       const old = oldCards.find(c => c.id === card.id);
       if (!old || old.stageId !== card.stageId || old.title !== card.title) {
-        await saveCard(card);
+        await saveCard(card, 'danas');
       }
     }
     for (const old of oldCards) {
@@ -84,22 +84,22 @@ export default function Home() {
 
   const handlePipelinesChange = useCallback(async (pipelines: Pipeline[]) => {
     setState(prev => prev ? { ...prev, pipelines } : prev);
-    await savePipelines(pipelines);
+    await savePipelines(pipelines, 'danas');
   }, []);
 
   const handleMusicChange = useCallback(async (musicBank: any[]) => {
     setState(prev => prev ? { ...prev, musicBank } : prev);
-    await saveWorkspaceKey('music_bank', musicBank);
+    await saveWorkspaceKey('music_bank', musicBank, 'danas');
   }, []);
 
   const handleFootageChange = useCallback(async (footageLinks: any[]) => {
     setState(prev => prev ? { ...prev, footageLinks } : prev);
-    await saveWorkspaceKey('footage_links', footageLinks);
+    await saveWorkspaceKey('footage_links', footageLinks, 'danas');
   }, []);
 
   const handleInspirationChange = useCallback(async (inspirationProfiles: any[]) => {
     setState(prev => prev ? { ...prev, inspirationProfiles } : prev);
-    await saveWorkspaceKey('inspiration_profiles', inspirationProfiles);
+    await saveWorkspaceKey('inspiration_profiles', inspirationProfiles, 'danas');
   }, []);
 
   if (loading) return (
@@ -166,7 +166,7 @@ export default function Home() {
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     setState(prev => prev ? { ...prev, cards: [...prev.cards, newCard] } : prev);
-    saveCard(newCard);
+    saveCard(newCard, 'danas');
   };
 
   return (
@@ -244,7 +244,7 @@ export default function Home() {
 
         <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
           {view.type === 'insights' && <Insights pipelines={state.pipelines} cards={state.cards} />}
-          {view.type === 'analytics' && <Analytics cards={state.cards} />}
+          {view.type === 'analytics' && <Analytics cards={state.cards} channelHandle="DanasBytautas" hubSlug="danas" />}
 
           {view.type === 'pipeline' && activePipeline && (
             <Board

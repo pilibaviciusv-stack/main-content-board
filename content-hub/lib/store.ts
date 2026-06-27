@@ -45,22 +45,38 @@ const DEFAULT_PIPELINES: Pipeline[] = [
   },
 ];
 
-export async function loadState(): Promise<AppState> {
+// Prefix IDs with hub slug so each hub has isolated data in the same tables
+function scopeId(id: string, hub: string) {
+  return `${hub}__${id}`;
+}
+
+export async function loadState(hub = 'danas'): Promise<AppState> {
   try {
+    const prefix = `${hub}__`;
+
     // Load pipelines
     const { data: pipelineRows } = await supabase
       .from('pipelines')
       .select('*')
+      .like('id', `${prefix}%`)
       .order('created_at');
 
-    let pipelines: Pipeline[] = pipelineRows && pipelineRows.length > 0
-      ? pipelineRows.map(r => ({ id: r.id, name: r.name, stages: r.stages }))
-      : DEFAULT_PIPELINES;
-
-    // If no pipelines exist yet, seed them
-    if (!pipelineRows || pipelineRows.length === 0) {
+    let pipelines: Pipeline[];
+    if (pipelineRows && pipelineRows.length > 0) {
+      pipelines = pipelineRows.map(r => ({
+        id: r.id.replace(prefix, ''),
+        name: r.name,
+        stages: r.stages,
+      }));
+    } else {
+      // Seed default pipelines for this hub
+      pipelines = DEFAULT_PIPELINES;
       await supabase.from('pipelines').insert(
-        DEFAULT_PIPELINES.map(p => ({ id: p.id, name: p.name, stages: p.stages }))
+        DEFAULT_PIPELINES.map(p => ({
+          id: scopeId(p.id, hub),
+          name: p.name,
+          stages: p.stages,
+        }))
       );
     }
 
@@ -68,12 +84,13 @@ export async function loadState(): Promise<AppState> {
     const { data: cardRows } = await supabase
       .from('cards')
       .select('*')
+      .like('id', `${prefix}%`)
       .order('created_at');
 
     const cards: ContentCard[] = cardRows
       ? cardRows.map(r => ({
           id: r.id,
-          pipelineId: r.pipeline_id,
+          pipelineId: r.pipeline_id.replace(prefix, ''),
           stageId: r.stage_id,
           title: r.title,
           ...r.data,
@@ -83,10 +100,12 @@ export async function loadState(): Promise<AppState> {
     // Load workspace items
     const { data: workspaceRows } = await supabase
       .from('workspace')
-      .select('*');
+      .select('*')
+      .like('key', `${prefix}%`);
 
     const ws = (workspaceRows || []).reduce((acc: any, row: any) => {
-      acc[row.key] = row.value;
+      const shortKey = row.key.replace(prefix, '');
+      acc[shortKey] = row.value;
       return acc;
     }, {});
 
@@ -111,25 +130,32 @@ export async function loadState(): Promise<AppState> {
   }
 }
 
-export async function savePipelines(pipelines: Pipeline[]) {
+export async function savePipelines(pipelines: Pipeline[], hub = 'danas') {
+  const prefix = `${hub}__`;
   for (const p of pipelines) {
-    await supabase.from('pipelines').upsert({ id: p.id, name: p.name, stages: p.stages });
+    await supabase.from('pipelines').upsert({
+      id: scopeId(p.id, hub),
+      name: p.name,
+      stages: p.stages,
+    });
   }
-  // Delete removed pipelines
-  const { data: existing } = await supabase.from('pipelines').select('id');
+  const { data: existing } = await supabase
+    .from('pipelines')
+    .select('id')
+    .like('id', `${prefix}%`);
   const existingIds = (existing || []).map((r: any) => r.id);
-  const currentIds = pipelines.map(p => p.id);
+  const currentIds = pipelines.map(p => scopeId(p.id, hub));
   const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
   if (toDelete.length > 0) {
     await supabase.from('pipelines').delete().in('id', toDelete);
   }
 }
 
-export async function saveCard(card: ContentCard) {
+export async function saveCard(card: ContentCard, hub = 'danas') {
   const { id, pipelineId, stageId, title, ...rest } = card;
   await supabase.from('cards').upsert({
     id,
-    pipeline_id: pipelineId,
+    pipeline_id: scopeId(pipelineId, hub),
     stage_id: stageId,
     title,
     data: rest,
@@ -141,6 +167,6 @@ export async function deleteCard(id: string) {
   await supabase.from('cards').delete().eq('id', id);
 }
 
-export async function saveWorkspaceKey(key: string, value: any) {
-  await supabase.from('workspace').upsert({ key, value });
+export async function saveWorkspaceKey(key: string, value: any, hub = 'danas') {
+  await supabase.from('workspace').upsert({ key: `${hub}__${key}`, value });
 }
