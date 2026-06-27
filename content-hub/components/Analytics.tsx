@@ -425,15 +425,22 @@ export default function Analytics({ cards }: Props) {
   const enrichWithFunnelType = useCallback((vids: VideoStat[]): VideoStat[] => {
     return vids.map(v => {
       const matchedCard = cardsRef.current.find(c => {
-        if (c.videoLink && v.url) {
-          const cvid = c.videoLink.toLowerCase();
-          if (v.id && cvid.includes(v.id)) return true;
-          if (cvid === v.url.toLowerCase()) return true;
+        // 1. Best match: video ID in the card's videoLink
+        if (c.videoLink && v.id) {
+          if (c.videoLink.includes(v.id)) return true;
         }
+        // 2. Exact URL match
+        if (c.videoLink && v.url) {
+          if (c.videoLink.toLowerCase() === v.url.toLowerCase()) return true;
+        }
+        // 3. Word overlap fuzzy match — at least 3 significant words in common
         if (c.title && v.title) {
-          const ct = c.title.toLowerCase().trim();
-          const vt = v.title.toLowerCase().trim();
-          if (ct.length > 5 && (vt.includes(ct) || ct.includes(vt.slice(0, 20)))) return true;
+          const stopWords = new Set(['ir', 'su', 'iš', 'į', 'kaip', 'kas', 'kai', 'per', 'tai', 'bet', 'ar', 'the', 'and', 'with', 'for', 'from', 'how', 'what', 'why', 'when', 'a', 'an', 'to', 'of', 'in', 'on', 'is', 'it', 'at']);
+          const words = (s: string) => s.toLowerCase().replace(/[^\wšžčąęėįųū ]/gi, '').split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+          const cw = new Set(words(c.title));
+          const vw = words(v.title);
+          const overlap = vw.filter(w => cw.has(w)).length;
+          if (overlap >= 2) return true;
         }
         return false;
       });

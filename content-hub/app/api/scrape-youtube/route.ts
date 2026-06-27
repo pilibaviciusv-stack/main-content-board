@@ -69,24 +69,21 @@ function parseDuration(iso: string): number {
 }
 
 function isShortVideo(item: any, durationSec: number): boolean {
-  // 1. YouTube marks Shorts with dimension "vertical" (height > width) AND short duration
-  const width = item.fileDetails?.videoStreams?.[0]?.widthPixels;
-  const height = item.fileDetails?.videoStreams?.[0]?.heightPixels;
-  
-  // 2. Check contentDetails.contentRating or tags
   const tags: string[] = item.snippet?.tags || [];
-  const hasShortTag = tags.some((t: string) => t.toLowerCase() === 'shorts' || t.toLowerCase() === '#shorts');
-  
-  // 3. Title contains #Shorts
   const title: string = item.snippet?.title || '';
+  
+  // Explicit Shorts markers
+  const hasShortTag = tags.some((t: string) => /^#?shorts?$/i.test(t));
   const titleHasShort = /\#shorts?/i.test(title);
   
-  // 4. Duration ≤ 180s AND no hours — Shorts are max 3 min
+  // Danas's shortform hashtags used consistently
+  const hasShortformTag = tags.some((t: string) => /dropshiperis|organikas/i.test(t)) ||
+    /\#dropshiperis|\#organikas/i.test(title);
+  
+  // Under 3 minutes = almost certainly a Short/vertical clip for this channel
   const shortDuration = durationSec > 0 && durationSec <= 180;
   
-  // Mark as Short if: title has #shorts tag OR has shorts tag OR (very short duration ≤60s)
-  // Conservative: only exclude if explicitly tagged or ≤60s
-  return titleHasShort || hasShortTag || (durationSec > 0 && durationSec <= 62);
+  return hasShortTag || titleHasShort || (shortDuration && hasShortformTag) || (durationSec > 0 && durationSec <= 62);
 }
 
 async function getVideoStats(videoIds: string[]) {
