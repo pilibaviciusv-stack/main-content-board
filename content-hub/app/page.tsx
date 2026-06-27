@@ -186,7 +186,7 @@ export default function LandingPage() {
       </div>
 
       {/* Header */}
-      <div style={{ padding:'18px 32px', borderBottom:'1px solid #ffffff06', display:'flex', alignItems:'center', justifyContent:'space-between', position:'relative', zIndex:1 }}>
+      <div style={{ padding:'14px 20px', borderBottom:'1px solid #ffffff06', display:'flex', alignItems:'center', justifyContent:'space-between', position:'relative', zIndex:1, flexWrap:'wrap', gap:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:34, height:34, background:'#0f1015', border:'1px solid #e11d4833', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 14px #e11d4818' }}>
             <span style={{ fontFamily:'monospace', fontWeight:900, fontSize:11 }}>
@@ -229,7 +229,7 @@ export default function LandingPage() {
         <h1 style={{ fontSize:20, fontWeight:800, color:'#f1f5f9', margin:'0 0 6px', letterSpacing:'-0.02em' }}>Choose a workspace</h1>
         <p style={{ fontSize:13, color:'#2d3340', margin:'0 0 44px' }}>Select a hub to open</p>
 
-        <div style={{ display:'flex', gap:20, flexWrap:'wrap', justifyContent:'center', maxWidth:860 }}>
+        <div className="hub-picker-cards" style={{ display:'flex', gap:20, flexWrap:'wrap', justifyContent:'center', maxWidth:860 }}>
           {visibleHubs.map(hub => {
             const status = getStatus(hub.slug);
             const isOpen = status === 'owner' || status === 'unlocked';
@@ -239,7 +239,7 @@ export default function LandingPage() {
             const isImg = hub.logo?.startsWith('data:') || hub.logo?.startsWith('http');
 
             return (
-              <div key={hub.slug} className="hub-card"
+              <div key={hub.slug} className="hub-card hub-picker-card"
                 style={{ width:215, background:'#0c0d1190', backdropFilter:'blur(12px)', border:`1px solid ${isOpen ? accent+'33' : '#1a1c22'}`, borderRadius:18, padding:'26px 22px', cursor:isOpen?'pointer':'default', position:'relative' }}
                 onClick={() => isOpen && router.push(`/hub/${hub.slug}`)}>
 

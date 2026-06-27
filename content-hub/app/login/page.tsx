@@ -35,7 +35,7 @@ export default function LoginPage() {
         <div style={{ position:'absolute', top:'40%', right:'20%', width:'40vw', height:'40vw', background:'radial-gradient(circle, #be123c0e 0%, transparent 70%)', animation:'blob3 20s ease-in-out infinite', borderRadius:'50%' }} />
       </div>
 
-      <div style={{ width:380, background:'#0c0d1188', backdropFilter:'blur(24px)', border:'1px solid #ffffff08', borderRadius:20, padding:'40px 36px', boxShadow:'0 0 80px #e11d480a, 0 32px 64px #00000060', position:'relative', zIndex:1 }}>
+      <div className="login-card" style={{ width:380, background:'#0c0d1188', backdropFilter:'blur(24px)', border:'1px solid #ffffff08', borderRadius:20, padding:'40px 36px', boxShadow:'0 0 80px #e11d480a, 0 32px 64px #00000060', position:'relative', zIndex:1 }}>
 
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:36 }}>
           <div style={{ width:42, height:42, background:'#0f1015', border:'1px solid #e11d4840', borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 20px #e11d4828' }}>

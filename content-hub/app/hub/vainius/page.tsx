@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutGrid, Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp } from 'lucide-react';
+import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp, Home, ArrowLeft } from 'lucide-react';
 import { AppState, ContentCard, Pipeline } from '@/lib/types';
 import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey } from '@/lib/store';
 import Board from '@/components/Board';
@@ -12,6 +12,7 @@ import YoutubeRoadmap from '@/components/YoutubeRoadmap';
 import InspirationProfiles from '@/components/InspirationProfiles';
 import ShortformGrid from '@/components/ShortformGrid';
 import Analytics from '@/components/Analytics';
+import { useRouter } from 'next/navigation';
 
 const HUB = 'vainius';
 
@@ -36,25 +37,21 @@ function getPipelineIcon(name: string) {
 const isYoutube = (name: string) => name.toLowerCase().includes('youtube') || name.toLowerCase().includes('yt');
 const isShortform = (name: string) => name.toLowerCase().includes('short') || name.toLowerCase().includes('reel') || name.toLowerCase().includes('tiktok');
 
-export default function VainiusHub() {
+export default function Home() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ type: 'insights' });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    loadState(HUB).then(s => {
-      setState(s);
-      setLoading(false);
-    });
+    loadState(HUB).then(s => { setState(s); setLoading(false); });
   }, []);
 
   const handleCardsChange = useCallback(async (newCards: ContentCard[], changedCard?: ContentCard, deletedId?: string) => {
     setState(prev => prev ? { ...prev, cards: newCards } : prev);
-    if (deletedId) {
-      await deleteCard(deletedId);
-    } else if (changedCard) {
-      await saveCard(changedCard, HUB);
-    }
+    if (deletedId) await deleteCard(deletedId);
+    else if (changedCard) await saveCard(changedCard, HUB);
   }, []);
 
   const handleCardSave = useCallback(async (card: ContentCard) => {
@@ -73,14 +70,10 @@ export default function VainiusHub() {
     setState(prev => prev ? { ...prev, cards: newCards } : prev);
     for (const card of newCards) {
       const old = oldCards.find(c => c.id === card.id);
-      if (!old || old.stageId !== card.stageId || old.title !== card.title) {
-        await saveCard(card, HUB);
-      }
+      if (!old || old.stageId !== card.stageId || old.title !== card.title) await saveCard(card, HUB);
     }
     for (const old of oldCards) {
-      if (!newCards.find(c => c.id === old.id)) {
-        await deleteCard(old.id);
-      }
+      if (!newCards.find(c => c.id === old.id)) await deleteCard(old.id);
     }
   }, [state]);
 
@@ -104,10 +97,12 @@ export default function VainiusHub() {
     await saveWorkspaceKey('inspiration_profiles', inspirationProfiles, HUB);
   }, []);
 
+  const navigate = (v: View) => { setView(v); setSidebarOpen(false); };
+
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0d0f14', flexDirection: 'column', gap: 16 }}>
       <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: 10 }} />
-      <div style={{ color: '#475569', fontSize: 14 }}>Loading Content Hub...</div>
+      <div style={{ color: '#475569', fontSize: 14 }}>Loading...</div>
     </div>
   );
 
@@ -137,22 +132,11 @@ export default function VainiusHub() {
     if (view.type === 'analytics') return 'Analytics';
     if (view.type === 'pipeline') return activePipeline?.name || '';
     if (view.type === 'roadmap') return 'Video Roadmap';
-    if (view.type === 'grid') return `${activePipeline?.name || 'Shortform'} Grid`;
+    if (view.type === 'grid') return `${activePipeline?.name || ''} Grid`;
     if (view.type === 'music') return 'Music Bank';
     if (view.type === 'footage') return 'Footage Links';
-    if (view.type === 'inspiration') return 'Inspiration Profiles';
-    return 'Pipelines';
-  };
-
-  const getSection = () => {
-    if (view.type === 'insights') return 'Overview';
-    if (view.type === 'analytics') return 'Overview';
-    if (view.type === 'pipeline') return 'Pipeline';
-    if (view.type === 'roadmap') return 'YouTube';
-    if (view.type === 'grid') return 'Shortform';
-    if (view.type === 'music' || view.type === 'footage') return 'Workspace';
-    if (view.type === 'inspiration') return 'Research';
-    return 'Admin';
+    if (view.type === 'inspiration') return 'Inspiration';
+    return 'Settings';
   };
 
   const addNewCard = () => {
@@ -160,7 +144,7 @@ export default function VainiusHub() {
     const firstStage = activePipeline.stages[0];
     if (!firstStage) return;
     const newCard: ContentCard = {
-      id: `${HUB}_` + Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
+      id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
       title: 'New card', stageId: firstStage.id, pipelineId: activePipeline.id,
       type: 'Top of Funnel', editor: '', format: '', scheduledDate: '', cost: '',
       headline: '', rawFileLink: '', referenceLink: '', frameLink: '', musicLink: '',
@@ -171,124 +155,153 @@ export default function VainiusHub() {
     saveCard(newCard, HUB);
   };
 
-  return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#0d0f14' }}>
-      {/* Sidebar */}
-      <div style={{ width: 220, background: '#0a0c11', borderRight: '1px solid #1e2130', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #1e2130' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, background: '#0f1015', border: '1px solid #e11d4833', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 11 }}>
-                <span style={{ color: '#e11d48' }}>[</span><span style={{ color: '#f1f5f9' }}>PI</span><span style={{ color: '#e11d48' }}>]</span>
-              </span>
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>⚡ Vainius</div>
-              <div style={{ fontSize: 10, color: '#374151' }}>PlugInfo Agency</div>
-            </div>
+  const SidebarContent = () => (
+    <>
+      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #1e2130' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, background: '#0f1015', border: '1px solid #e11d4833', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 11 }}>
+              <span style={{ color: '#e11d48' }}>[</span><span style={{ color: '#f1f5f9' }}>PI</span><span style={{ color: '#e11d48' }}>]</span>
+            </span>
           </div>
-        </div>
-
-        <div style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
-          {navItem('Main Insights', <BarChart2 size={14} />, view.type === 'insights', () => setView({ type: 'insights' }))}
-          {navItem('Analytics', <TrendingUp size={14} />, view.type === 'analytics', () => setView({ type: 'analytics' }), true)}
-          <div style={{ height: 16 }} />
-
-          <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pipelines</div>
-          {state.pipelines.map(p => (
-            <div key={p.id}>
-              {navItem(p.name, getPipelineIcon(p.name), view.type === 'pipeline' && (view as any).id === p.id, () => setView({ type: 'pipeline', id: p.id }))}
-              {isYoutube(p.name) && navItem('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => setView({ type: 'roadmap', pipelineId: p.id }), true)}
-              {(isShortform(p.name) || (!isYoutube(p.name) && !p.name.toLowerCase().includes('stor'))) && navItem('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => setView({ type: 'grid', pipelineId: p.id }), true)}
-            </div>
-          ))}
-
-          <div style={{ marginTop: 16 }}>
-            <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Workspace</div>
-            {navItem('Music Bank', <Music size={14} />, view.type === 'music', () => setView({ type: 'music' }))}
-            {navItem('Footage Links', <Film size={14} />, view.type === 'footage', () => setView({ type: 'footage' }))}
-            {navItem('Inspiration', <Users size={14} />, view.type === 'inspiration', () => setView({ type: 'inspiration' }))}
-          </div>
-
-          <div style={{ marginTop: 16 }}>
-            <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Admin</div>
-            {navItem('Pipelines', <Settings size={14} />, view.type === 'settings', () => setView({ type: 'settings' }))}
-          </div>
-        </div>
-
-        <div style={{ padding: '12px 16px', borderTop: '1px solid #1e2130' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 11, color: '#475569' }}>Total cards</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{totalCards}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: '#475569' }}>Active this week</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#6366f1' }}>{thisWeek}</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>⚡ Vainius</div>
+            <div style={{ fontSize: 10, color: '#374151' }}>PlugInfo Agency</div>
           </div>
         </div>
       </div>
+      <div style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
+        {navItem('Main Insights', <BarChart2 size={14} />, view.type === 'insights', () => navigate({ type: 'insights' }))}
+        {navItem('Analytics', <TrendingUp size={14} />, view.type === 'analytics', () => navigate({ type: 'analytics' }), true)}
+        <div style={{ height: 16 }} />
+        <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pipelines</div>
+        {state.pipelines.map(p => (
+          <div key={p.id}>
+            {navItem(p.name, getPipelineIcon(p.name), view.type === 'pipeline' && (view as any).id === p.id, () => navigate({ type: 'pipeline', id: p.id }))}
+            {isYoutube(p.name) && navItem('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => navigate({ type: 'roadmap', pipelineId: p.id }), true)}
+            {(isShortform(p.name) || (!isYoutube(p.name) && !p.name.toLowerCase().includes('stor'))) && navItem('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)}
+          </div>
+        ))}
+        <div style={{ marginTop: 16 }}>
+          <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Workspace</div>
+          {navItem('Music Bank', <Music size={14} />, view.type === 'music', () => navigate({ type: 'music' }))}
+          {navItem('Footage Links', <Film size={14} />, view.type === 'footage', () => navigate({ type: 'footage' }))}
+          {navItem('Inspiration', <Users size={14} />, view.type === 'inspiration', () => navigate({ type: 'inspiration' }))}
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Admin</div>
+          {navItem('Pipelines', <Settings size={14} />, view.type === 'settings', () => navigate({ type: 'settings' }))}
+        </div>
+      </div>
+      <div style={{ padding: '12px 16px', borderTop: '1px solid #1e2130' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 11, color: '#475569' }}>Total cards</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{totalCards}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, color: '#475569' }}>Active this week</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#6366f1' }}>{thisWeek}</span>
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="hub-layout" style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#0d0f14' }}>
+
+      {/* Mobile overlay sidebar */}
+      {sidebarOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex' }}>
+          <div style={{ position: 'absolute', inset: 0, background: '#000000aa' }} onClick={() => setSidebarOpen(false)} />
+          <div style={{ width: 260, background: '#0a0c11', borderRight: '1px solid #1e2130', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1, height: '100%', overflowY: 'auto' }}>
+            <SidebarContent />
+          </div>
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <div className="hub-sidebar" style={{ width: 220, background: '#0a0c11', borderRight: '1px solid #1e2130', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <SidebarContent />
+      </div>
 
       {/* Main */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid #1e2130', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div>
-            <div style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>{getSection()}</div>
-            <h1 style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 800, color: '#e2e8f0' }}>{getTitle()}</h1>
-          </div>
-          {view.type === 'pipeline' && activePipeline && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 13, color: '#475569' }}>{state.cards.filter(c => c.pipelineId === activePipeline.id).length} cards</span>
-              <button onClick={addNewCard}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                <Plus size={15} /> New Card
-              </button>
+      <div className="hub-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="hub-header" style={{ padding: '16px 24px', borderBottom: '1px solid #1e2130', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Hamburger — mobile only */}
+            <button onClick={() => setSidebarOpen(true)}
+              style={{ display: 'none', background: 'none', border: '1px solid #1e2130', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: '#64748b' }}
+              className="mobile-menu-btn">
+              ☰
+            </button>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#e2e8f0' }}>{getTitle()}</h1>
             </div>
-          )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {view.type === 'pipeline' && activePipeline && (
+              <>
+                <span style={{ fontSize: 12, color: '#475569' }}>{state.cards.filter(c => c.pipelineId === activePipeline.id).length} cards</span>
+                <button onClick={addNewCard}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                  <Plus size={15} /> New
+                </button>
+              </>
+            )}
+            <button onClick={() => router.push('/')}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid #1e2130', borderRadius: 7, padding: '6px 10px', color: '#4b5563', cursor: 'pointer', fontSize: 12 }}>
+              <ArrowLeft size={12} />
+            </button>
+          </div>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
+        <div className="hub-content" style={{ flex: 1, overflow: 'auto', padding: 24 }}>
           {view.type === 'insights' && <Insights pipelines={state.pipelines} cards={state.cards} />}
           {view.type === 'analytics' && <Analytics cards={state.cards} hubSlug="vainius" />}
-
           {view.type === 'pipeline' && activePipeline && (
-            <Board
-              pipeline={activePipeline}
-              cards={state.cards}
-              users={state.users}
-              onCardsChange={handleBoardCardsChange}
-              onCardSave={handleCardSave}
-              onCardDelete={handleCardDelete}
-            />
+            <Board pipeline={activePipeline} cards={state.cards} users={state.users}
+              onCardsChange={handleBoardCardsChange} onCardSave={handleCardSave} onCardDelete={handleCardDelete} />
           )}
-
           {view.type === 'roadmap' && activePipeline && (
-            <YoutubeRoadmap
-              pipeline={activePipeline}
-              cards={state.cards}
-              users={state.users}
-              onCardsChange={handleBoardCardsChange}
-              onCardSave={handleCardSave}
-              onCardDelete={handleCardDelete}
-            />
+            <YoutubeRoadmap pipeline={activePipeline} cards={state.cards} users={state.users}
+              onCardsChange={handleBoardCardsChange} onCardSave={handleCardSave} onCardDelete={handleCardDelete} />
           )}
-
           {view.type === 'grid' && activePipeline && (
-            <ShortformGrid
-              pipeline={activePipeline}
-              cards={state.cards}
-              users={state.users}
-              onCardsChange={handleBoardCardsChange}
-              onCardSave={handleCardSave}
-              onCardDelete={handleCardDelete}
-            />
+            <ShortformGrid pipeline={activePipeline} cards={state.cards} users={state.users}
+              onCardsChange={handleBoardCardsChange} onCardSave={handleCardSave} onCardDelete={handleCardDelete} />
           )}
-
           {view.type === 'music' && <MusicBank tracks={state.musicBank} onChange={handleMusicChange} />}
           {view.type === 'footage' && <FootageLinks items={state.footageLinks} onChange={handleFootageChange} />}
           {view.type === 'inspiration' && <InspirationProfiles profiles={state.inspirationProfiles} onChange={handleInspirationChange} />}
           {view.type === 'settings' && <PipelineSettings pipelines={state.pipelines} onChange={handlePipelinesChange} />}
         </div>
       </div>
+
+      {/* Mobile bottom nav */}
+      <nav className="hub-mobile-nav">
+        <button className={`hub-mobile-nav-btn ${view.type === 'insights' ? 'active' : ''}`} onClick={() => navigate({ type: 'insights' })}>
+          <Home size={18} /> Home
+        </button>
+        {state.pipelines.slice(0, 2).map(p => (
+          <button key={p.id} className={`hub-mobile-nav-btn ${view.type === 'pipeline' && (view as any).id === p.id ? 'active' : ''}`}
+            onClick={() => navigate({ type: 'pipeline', id: p.id })}>
+            {isYoutube(p.name) ? <PlaySquare size={18} /> : <Video size={18} />}
+            {p.name.length > 7 ? p.name.slice(0, 7) + '…' : p.name}
+          </button>
+        ))}
+        <button className={`hub-mobile-nav-btn ${view.type === 'analytics' ? 'active' : ''}`} onClick={() => navigate({ type: 'analytics' })}>
+          <TrendingUp size={18} /> Stats
+        </button>
+        <button className={`hub-mobile-nav-btn`} onClick={() => setSidebarOpen(true)}>
+          <Settings size={18} /> More
+        </button>
+      </nav>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .mobile-menu-btn { display: flex !important; }
+        }
+      `}</style>
     </div>
   );
 }
