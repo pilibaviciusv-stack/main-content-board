@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Lock, LogOut, Clock, X, Check, Upload, Users, Eye, EyeOff } from 'lucide-react';
@@ -16,6 +16,114 @@ const DEFAULT_HUBS: HubMeta[] = [
 ];
 
 const HUB_SLUGS = ['danas', 'vainius', 'joris'];
+
+const RED_PALETTE: [number,number,number][] = [
+  [180,30,30],[200,40,40],[160,20,20],[220,50,50],[140,15,15],[190,35,35],[210,45,45],
+];
+
+function BubbleCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouse = useRef({ x: -999, y: -999 });
+  const bubblesRef = useRef<any[]>([]);
+  const rafRef = useRef<number>(0);
+
+  const init = useCallback((canvas: HTMLCanvasElement) => {
+    const W = canvas.width = canvas.offsetWidth;
+    const H = canvas.height = canvas.offsetHeight;
+    const count = Math.max(14, Math.floor((W * H) / 16000));
+    bubblesRef.current = Array.from({ length: count }, () => {
+      const [r,g,b] = RED_PALETTE[Math.floor(Math.random() * RED_PALETTE.length)];
+      const radius = 20 + Math.random() * 55;
+      return {
+        x: Math.random() * W, y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+        r: radius, g: Math.random() * Math.PI * 2,
+        gs: 0.003 + Math.random() * 0.008,
+        ga: 0.38 + Math.random() * 0.32,
+        color: [r, g, b] as [number,number,number],
+        px: 0, py: 0,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    init(canvas);
+
+    const onResize = () => { init(canvas); };
+    window.addEventListener('resize', onResize);
+
+    const onMouseMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouse.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+    const onMouseLeave = () => { mouse.current = { x: -999, y: -999 }; };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseleave', onMouseLeave);
+
+    let t = 0;
+    const draw = () => {
+      const W = canvas.width, H = canvas.height;
+      t += 0.016;
+      ctx.clearRect(0, 0, W, H);
+
+      for (const b of bubblesRef.current) {
+        b.g += b.gs;
+        b.x += b.vx + Math.sin(b.g * 0.7) * 0.14;
+        b.y += b.vy + Math.cos(b.g * 0.5) * 0.14 + Math.sin(b.g + t * b.gs * 60) * 0.04;
+
+        if (b.x < -b.r) b.x = W + b.r;
+        if (b.x > W + b.r) b.x = -b.r;
+        if (b.y < -b.r) b.y = H + b.r;
+        if (b.y > H + b.r) b.y = -b.r;
+
+        const dx = b.x - mouse.current.x;
+        const dy = b.y - mouse.current.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const influence = 100 + b.r;
+        if (dist < influence) {
+          const force = 1 - dist / influence;
+          const angle = Math.atan2(dy, dx);
+          b.px += Math.cos(angle) * force * 5;
+          b.py += Math.sin(angle) * force * 5;
+        }
+        b.px *= 0.88; b.py *= 0.88;
+        b.x += b.px * 0.07; b.y += b.py * 0.07;
+
+        const [r, g2, bl] = b.color;
+        const grd = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.05, b.x, b.y, b.r);
+        grd.addColorStop(0, `rgba(${r+50},${g2+20},${bl+20},${b.ga})`);
+        grd.addColorStop(0.5, `rgba(${r},${g2},${bl},${b.ga * 0.7})`);
+        grd.addColorStop(1, `rgba(${Math.max(0,r-40)},0,0,0)`);
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
+        ctx.fill();
+        ctx.strokeStyle = `rgba(${r+60},${g2+30},${bl+30},0.12)`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      rafRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseleave', onMouseLeave);
+    };
+  }, [init]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block', pointerEvents: 'none', zIndex: 0 }}
+    />
+  );
+}
 
 export default function LandingPage() {
   const [userName, setUserName] = useState('');
@@ -167,23 +275,14 @@ export default function LandingPage() {
     <div style={{ minHeight:'100vh', background:'#080a0e', display:'flex', flexDirection:'column', fontFamily:'system-ui,-apple-system,sans-serif', position:'relative', overflow:'hidden' }}>
 
       <style>{`
-        @keyframes blob1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(80px,-60px) scale(1.2)}66%{transform:translate(-40px,70px) scale(0.85)}}
-        @keyframes blob2{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-70px,80px) scale(1.1)}66%{transform:translate(90px,-40px) scale(0.9)}}
-        @keyframes blob3{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(50px,60px) scale(0.88)}66%{transform:translate(-80px,-30px) scale(1.15)}}
-        @keyframes blob4{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-50px) scale(1.1)}}
         .hub-card:hover{transform:translateY(-2px)}
         .hub-card{transition:all 0.2s ease!important}
         .toggle-btn{transition:all 0.15s ease}
         .toggle-btn:hover{opacity:0.8}
       `}</style>
 
-      {/* Animated blobs */}
-      <div style={{ position:'absolute', inset:0, pointerEvents:'none', zIndex:0 }}>
-        <div style={{ position:'absolute', top:'-15%', left:'-15%', width:'70vw', height:'70vw', background:'radial-gradient(circle, #e11d4814 0%, transparent 65%)', animation:'blob1 14s ease-in-out infinite', borderRadius:'50%' }} />
-        <div style={{ position:'absolute', bottom:'-20%', right:'-10%', width:'65vw', height:'65vw', background:'radial-gradient(circle, #be123c10 0%, transparent 65%)', animation:'blob2 18s ease-in-out infinite', borderRadius:'50%' }} />
-        <div style={{ position:'absolute', top:'35%', right:'15%', width:'45vw', height:'45vw', background:'radial-gradient(circle, #e11d480c 0%, transparent 65%)', animation:'blob3 22s ease-in-out infinite', borderRadius:'50%' }} />
-        <div style={{ position:'absolute', top:'10%', right:'40%', width:'30vw', height:'30vw', background:'radial-gradient(circle, #9f123808 0%, transparent 65%)', animation:'blob4 26s ease-in-out infinite', borderRadius:'50%' }} />
-      </div>
+      {/* Bubble canvas background */}
+      <BubbleCanvas />
 
       {/* Header */}
       <div style={{ padding:'14px 20px', borderBottom:'1px solid #ffffff06', display:'flex', alignItems:'center', justifyContent:'space-between', position:'relative', zIndex:1, flexWrap:'wrap', gap:8 }}>
