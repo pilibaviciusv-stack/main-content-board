@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutGrid, Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3 } from 'lucide-react';
+import { LayoutGrid, Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp } from 'lucide-react';
 import { AppState, ContentCard, Pipeline } from '@/lib/types';
 import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey } from '@/lib/store';
 import Board from '@/components/Board';
@@ -11,9 +11,11 @@ import Insights from '@/components/Insights';
 import YoutubeRoadmap from '@/components/YoutubeRoadmap';
 import InspirationProfiles from '@/components/InspirationProfiles';
 import ShortformGrid from '@/components/ShortformGrid';
+import Analytics from '@/components/Analytics';
 
 type View =
   | { type: 'insights' }
+  | { type: 'analytics' }
   | { type: 'pipeline'; id: string }
   | { type: 'roadmap'; pipelineId: string }
   | { type: 'grid'; pipelineId: string }
@@ -130,6 +132,7 @@ export default function Home() {
 
   const getTitle = () => {
     if (view.type === 'insights') return 'Main Insights';
+    if (view.type === 'analytics') return 'Analytics';
     if (view.type === 'pipeline') return activePipeline?.name || '';
     if (view.type === 'roadmap') return 'Video Roadmap';
     if (view.type === 'grid') return `${activePipeline?.name || 'Shortform'} Grid`;
@@ -141,6 +144,7 @@ export default function Home() {
 
   const getSection = () => {
     if (view.type === 'insights') return 'Overview';
+    if (view.type === 'analytics') return 'Overview';
     if (view.type === 'pipeline') return 'Pipeline';
     if (view.type === 'roadmap') return 'YouTube';
     if (view.type === 'grid') return 'Shortform';
@@ -183,6 +187,7 @@ export default function Home() {
 
         <div style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
           {navItem('Main Insights', <BarChart2 size={14} />, view.type === 'insights', () => setView({ type: 'insights' }))}
+          {navItem('Analytics', <TrendingUp size={14} />, view.type === 'analytics', () => setView({ type: 'analytics' }), true)}
           <div style={{ height: 16 }} />
 
           <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pipelines</div>
@@ -239,6 +244,7 @@ export default function Home() {
 
         <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
           {view.type === 'insights' && <Insights pipelines={state.pipelines} cards={state.cards} />}
+          {view.type === 'analytics' && <Analytics cards={state.cards} />}
 
           {view.type === 'pipeline' && activePipeline && (
             <Board
