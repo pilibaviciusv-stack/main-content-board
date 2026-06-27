@@ -29,7 +29,7 @@ async function getChannelStats(channelId: string) {
   };
 }
 
-async function getAllVideoIds(channelId: string): Promise<{id: string, title: string, thumbnail: string, publishedAt: string}[]> {
+async function getAllVideoIds(channelId: string) {
   const videos: any[] = [];
   let pageToken = '';
 
@@ -59,7 +59,6 @@ async function getAllVideoIds(channelId: string): Promise<{id: string, title: st
   return videos;
 }
 
-// Parse ISO 8601 duration to seconds: PT1M30S → 90
 function parseDuration(iso: string): number {
   const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return 0;
@@ -69,12 +68,33 @@ function parseDuration(iso: string): number {
   return h * 3600 + m * 60 + s;
 }
 
+function isShortVideo(item: any, durationSec: number): boolean {
+  // 1. YouTube marks Shorts with dimension "vertical" (height > width) AND short duration
+  const width = item.fileDetails?.videoStreams?.[0]?.widthPixels;
+  const height = item.fileDetails?.videoStreams?.[0]?.heightPixels;
+  
+  // 2. Check contentDetails.contentRating or tags
+  const tags: string[] = item.snippet?.tags || [];
+  const hasShortTag = tags.some((t: string) => t.toLowerCase() === 'shorts' || t.toLowerCase() === '#shorts');
+  
+  // 3. Title contains #Shorts
+  const title: string = item.snippet?.title || '';
+  const titleHasShort = /\#shorts?/i.test(title);
+  
+  // 4. Duration ≤ 180s AND no hours — Shorts are max 3 min
+  const shortDuration = durationSec > 0 && durationSec <= 180;
+  
+  // Mark as Short if: title has #shorts tag OR has shorts tag OR (very short duration ≤60s)
+  // Conservative: only exclude if explicitly tagged or ≤60s
+  return titleHasShort || hasShortTag || (durationSec > 0 && durationSec <= 62);
+}
+
 async function getVideoStats(videoIds: string[]) {
   const stats: Record<string, any> = {};
   for (let i = 0; i < videoIds.length; i += 50) {
     const chunk = videoIds.slice(i, i + 50);
     const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${chunk.join(',')}&key=${API_KEY}`,
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails,snippet&id=${chunk.join(',')}&key=${API_KEY}`,
       { cache: 'no-store' }
     );
     const data = await res.json();
@@ -85,8 +105,7 @@ async function getVideoStats(videoIds: string[]) {
         likes: parseInt(item.statistics?.likeCount || '0'),
         comments: parseInt(item.statistics?.commentCount || '0'),
         durationSec,
-        durationStr: item.contentDetails?.duration || '',
-        isShort: durationSec > 0 && durationSec <= 60,
+        isShort: isShortVideo(item, durationSec),
       };
     }
   }
@@ -120,13 +139,13 @@ export async function GET() {
       isShort: statsMap[v.id]?.isShort || false,
     }));
 
-    // Separate shorts and long-form
-    const longForm = allVideos.filter((v: any) => !v.isShort);
-    const shorts = allVideos.filter((v: any) => v.isShort);
+    const longForm = allVideos
+      .filter((v: any) => !v.isShort)
+      .sort((a: any, b: any) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
-    // Sort newest first
-    longForm.sort((a: any, b: any) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-    shorts.sort((a: any, b: any) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    const shorts = allVideos
+      .filter((v: any) => v.isShort)
+      .sort((a: any, b: any) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
     return NextResponse.json({
       channel: channelStats,

@@ -92,6 +92,7 @@ function VideoCard({
   maxViews,
   maxLikes,
   maxComments,
+  onExclude,
 }: {
   video: VideoStat;
   rank: number;
@@ -99,6 +100,7 @@ function VideoCard({
   maxViews: number;
   maxLikes: number;
   maxComments: number;
+  onExclude: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const ratio = avgViews > 0 ? video.views / avgViews : 1;
@@ -237,6 +239,12 @@ function VideoCard({
             >
               <ExternalLink size={10} /> Open video
             </a>
+            <button
+              onClick={e => { e.stopPropagation(); onExclude(video.id); }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#f87171', background: 'none', border: '1px solid #7f1d1d', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', marginLeft: 8, fontWeight: 600 }}
+            >
+              ✕ Exclude from data
+            </button>
           </div>
         )}
 
@@ -383,6 +391,33 @@ export default function Analytics({ cards }: Props) {
   const [lastScraped, setLastScraped] = useState('');
   const [filterFunnel, setFilterFunnel] = useState<'ALL' | 'TOF' | 'MOF' | 'BOF' | 'UNKNOWN'>('ALL');
   const [filterPlatform, setFilterPlatform] = useState<'all' | 'instagram'>('all');
+  const [excludedIds, setExcludedIds] = useState<string[]>([]);
+
+  // Load excluded IDs on mount
+  useEffect(() => {
+    fetch('/api/excluded-videos')
+      .then(r => r.json())
+      .then(d => setExcludedIds(d.ids || []))
+      .catch(() => {});
+  }, []);
+
+  const handleExclude = useCallback(async (id: string) => {
+    setExcludedIds(prev => [...prev, id]);
+    await fetch('/api/excluded-videos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  }, []);
+
+  const handleUnexclude = useCallback(async (id: string) => {
+    setExcludedIds(prev => prev.filter(x => x !== id));
+    await fetch('/api/excluded-videos', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  }, []);
 
   const cardsRef = React.useRef(cards);
   cardsRef.current = cards;
@@ -447,7 +482,8 @@ export default function Analytics({ cards }: Props) {
   }, [loadData]);
 
   // Filtered + sorted videos
-  const filteredVideos = videos.filter(v => {
+  const activeVideos = videos.filter(v => !excludedIds.includes(v.id));
+  const filteredVideos = activeVideos.filter(v => {
     if (filterFunnel !== 'ALL') {
       if (filterFunnel === 'UNKNOWN' && v.funnelType) return false;
       if (filterFunnel !== 'UNKNOWN' && v.funnelType !== filterFunnel) return false;
@@ -465,18 +501,19 @@ export default function Analytics({ cards }: Props) {
   });
 
   // Stats
-  const totalViews = videos.reduce((s, v) => s + v.views, 0);
-  const avgViews = Math.round(avg(videos.map(v => v.views)));
-  const maxViews = Math.max(...videos.map(v => v.views), 0);
-  const maxLikes = Math.max(...videos.map(v => v.likes), 0);
-  const maxComments = Math.max(...videos.map(v => v.comments), 0);
+  const totalViews = activeVideos.reduce((s, v) => s + v.views, 0);
+  const avgViews = Math.round(avg(activeVideos.map(v => v.views)));
+  const maxViews = Math.max(...activeVideos.map(v => v.views), 0);
+  const maxLikes = Math.max(...activeVideos.map(v => v.likes), 0);
+  const maxComments = Math.max(...activeVideos.map(v => v.comments), 0);
 
-  const tofVideos = videos.filter(v => v.funnelType === 'TOF');
-  const mofVideos = videos.filter(v => v.funnelType === 'MOF');
-  const bofVideos = videos.filter(v => v.funnelType === 'BOF');
-  const unknownVideos = videos.filter(v => !v.funnelType);
+  const tofVideos = activeVideos.filter(v => v.funnelType === 'TOF');
+  const mofVideos = activeVideos.filter(v => v.funnelType === 'MOF');
+  const bofVideos = activeVideos.filter(v => v.funnelType === 'BOF');
+  const unknownVideos = activeVideos.filter(v => !v.funnelType);
 
-  const outlierCount = videos.filter(v => avgViews > 0 && v.views / avgViews >= 2).length;
+  const outlierCount = activeVideos.filter(v => avgViews > 0 && v.views / avgViews >= 2).length;
+  const excludedVideos = videos.filter(v => excludedIds.includes(v.id));
 
   const chipStyle = (active: boolean, color: string) => ({
     padding: '5px 12px', borderRadius: 20,
@@ -626,7 +663,7 @@ export default function Analytics({ cards }: Props) {
           )}
 
           {/* Views growth chart */}
-          {platform === 'youtube' && <ViewsGrowthChart videos={videos} />}
+          {platform === 'youtube' && <ViewsGrowthChart videos={activeVideos} />}
 
           {/* Filters + sort */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -665,6 +702,7 @@ export default function Analytics({ cards }: Props) {
                 maxViews={maxViews}
                 maxLikes={maxLikes}
                 maxComments={maxComments}
+                onExclude={handleExclude}
               />
             ))}
           </div>
@@ -672,6 +710,30 @@ export default function Analytics({ cards }: Props) {
           {sortedVideos.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#334155', fontSize: 13 }}>
               No videos match this filter.
+            </div>
+          )}
+
+          {/* Excluded videos */}
+          {excludedVideos.length > 0 && (
+            <div style={{ marginTop: 32, borderTop: '1px solid #1e2130', paddingTop: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+                Excluded from data ({excludedVideos.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {excludedVideos.map(v => (
+                  <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0d0f14', border: '1px solid #1e2130', borderRadius: 8, padding: '8px 12px', opacity: 0.6 }}>
+                    {v.thumbnail && <img src={v.thumbnail} style={{ width: 48, height: 27, objectFit: 'cover', borderRadius: 4 }} />}
+                    <span style={{ flex: 1, fontSize: 12, color: '#64748b' }}>{v.title}</span>
+                    <span style={{ fontSize: 11, color: '#334155' }}>{fmt(v.views)} views</span>
+                    <button
+                      onClick={() => handleUnexclude(v.id)}
+                      style={{ fontSize: 11, color: '#6366f1', background: 'none', border: '1px solid #6366f133', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}
+                    >
+                      Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </>
