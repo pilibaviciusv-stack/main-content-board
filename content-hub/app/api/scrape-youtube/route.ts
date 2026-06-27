@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const CHANNEL_URL = 'https://www.youtube.com/@organikaslt';
+const CHANNEL_URL = 'https://www.youtube.com/@DanasBytautas';
 
 async function fetchWithUA(url: string) {
   const res = await fetch(url, {

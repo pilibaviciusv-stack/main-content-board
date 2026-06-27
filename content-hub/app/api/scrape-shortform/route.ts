@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
 // Danas's social handles
-const TIKTOK_HANDLE = 'organikaslt';
-const IG_HANDLE = 'organikaslt';
+const TIKTOK_HANDLE = '_moneydan'; // unused for now
+const IG_HANDLE = '_moneydan';
 
 async function fetchWithUA(url: string) {
   const res = await fetch(url, {

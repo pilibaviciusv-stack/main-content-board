@@ -308,7 +308,7 @@ export default function Analytics({ cards }: Props) {
   const [sort, setSort] = useState<SortKey>('views');
   const [lastScraped, setLastScraped] = useState('');
   const [filterFunnel, setFilterFunnel] = useState<'ALL' | 'TOF' | 'MOF' | 'BOF' | 'UNKNOWN'>('ALL');
-  const [filterPlatform, setFilterPlatform] = useState<'all' | 'tiktok' | 'instagram'>('all');
+  const [filterPlatform, setFilterPlatform] = useState<'all' | 'instagram'>('all');
 
   // Match videos to pipeline cards by URL or title to get funnel type
   const enrichWithFunnelType = useCallback((vids: VideoStat[]): VideoStat[] => {
@@ -355,13 +355,12 @@ export default function Analytics({ cards }: Props) {
           setLastScraped(data.scrapedAt || '');
         }
       } else {
-        const res = await fetch('/api/scrape-shortform');
+        const res = await fetch('/api/scrape-shortform?platform=instagram');
         const data = await res.json();
-        if (data.error && !data.tiktok?.length && !data.instagram?.length) {
+        if (data.error && !data.instagram?.length) {
           setError(data.error);
         } else {
           const all = [
-            ...(data.tiktok || []),
             ...(data.instagram || []),
           ];
           setVideos(enrichWithFunnelType(all));
@@ -474,9 +473,9 @@ export default function Analytics({ cards }: Props) {
       {/* Shortform sub-filter */}
       {platform === 'shortform' && !loading && videos.length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-          {(['all', 'tiktok', 'instagram'] as const).map(p => (
-            <button key={p} onClick={() => setFilterPlatform(p)} style={chipStyle(filterPlatform === p, p === 'tiktok' ? '#e879f9' : p === 'instagram' ? '#f97316' : '#6366f1')}>
-              {p === 'all' ? 'All' : p === 'tiktok' ? '🎵 TikTok' : '📸 Instagram'}
+          {((['all', 'instagram'] as const)).map(p => (
+            <button key={p} onClick={() => setFilterPlatform(p)} style={chipStyle(filterPlatform === p, p === 'instagram' ? '#f97316' : '#6366f1')}>
+              {p === 'all' ? 'All' : '📸 Instagram'}
             </button>
           ))}
         </div>
@@ -485,7 +484,7 @@ export default function Analytics({ cards }: Props) {
       {loading && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: 16 }}>
           <div style={{ width: 36, height: 36, border: '3px solid #1e2130', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          <div style={{ fontSize: 13, color: '#475569' }}>Scraping {platform === 'youtube' ? 'YouTube channel' : 'TikTok & Instagram'}...</div>
+          <div style={{ fontSize: 13, color: '#475569' }}>Scraping {platform === 'youtube' ? 'YouTube channel' : 'Instagram'}...</div>
           <div style={{ fontSize: 11, color: '#334155' }}>This may take a few seconds</div>
         </div>
       )}
@@ -498,7 +497,7 @@ export default function Analytics({ cards }: Props) {
             <div style={{ fontSize: 11, color: '#fca5a5' }}>{error}</div>
             <div style={{ fontSize: 11, color: '#f87171', marginTop: 8 }}>
               {platform === 'shortform'
-                ? 'TikTok and Instagram block automated scraping. Try adding videos manually via pipeline cards with video links.'
+                ? 'Instagram blocks automated scraping. Try adding videos manually via pipeline cards with video links.'
                 : 'YouTube may have updated their page structure. Check the channel URL or try again.'}
             </div>
           </div>
