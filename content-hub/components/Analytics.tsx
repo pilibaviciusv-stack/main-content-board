@@ -325,7 +325,7 @@ function ViewsGrowthChart({ videos }: { videos: VideoStat[] }) {
   );
 }
 
-
+function FunnelRow({ label, videos, color }: { label: string; videos: VideoStat[]; color: string }) {
   if (!videos.length) return null;
   const avgV = Math.round(avg(videos.map(v => v.views)));
   const maxV = Math.max(...videos.map(v => v.views));
