@@ -546,10 +546,10 @@ export default function Analytics({ cards, channelHandle, hubSlug }: Props) {
       <div style={{ color: '#e2e8f0' }}>
         {/* Platform switcher */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button onClick={() => setPlatform('youtube')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, background: platform === 'youtube' ? '#ef444422' : '#13151e', color: platform === 'youtube' ? '#ef4444' : '#64748b', border: `1.5px solid ${platform === 'youtube' ? '#ef444455' : '#1e2130'}`, cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all 0.15s' }}>
+          <button onClick={() => setPlatform('youtube')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, background: '#ef444422', color: '#ef4444', border: '1.5px solid #ef444455', cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all 0.15s' }}>
             <YtIcon /> YouTube
           </button>
-          <button onClick={() => setPlatform('shortform')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, background: platform === 'shortform' ? '#e879f922' : '#13151e', color: platform === 'shortform' ? '#e879f9' : '#64748b', border: `1.5px solid ${platform === 'shortform' ? '#e879f955' : '#1e2130'}`, cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all 0.15s' }}>
+          <button onClick={() => setPlatform('shortform')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, background: '#13151e', color: '#64748b', border: '1.5px solid #1e2130', cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all 0.15s' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg> Shortform
           </button>
         </div>
