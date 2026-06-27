@@ -83,7 +83,7 @@ function isShortVideo(item: any, durationSec: number): boolean {
   // Under 3 minutes = almost certainly a Short/vertical clip for this channel
   const shortDuration = durationSec > 0 && durationSec <= 180;
   
-  return hasShortTag || titleHasShort || (shortDuration && hasShortformTag) || (durationSec > 0 && durationSec <= 62);
+  return hasShortTag || titleHasShort || (shortDuration && hasShortformTag) || (durationSec > 0 && durationSec <= 180);
 }
 
 async function getVideoStats(videoIds: string[]) {
