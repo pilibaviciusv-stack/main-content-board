@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutGrid, Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp } from 'lucide-react';
+import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp } from 'lucide-react';
 import { AppState, ContentCard, Pipeline } from '@/lib/types';
 import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey } from '@/lib/store';
 import Board from '@/components/Board';
@@ -175,12 +175,14 @@ export default function Home() {
       <div style={{ width: 220, background: '#0a0c11', borderRight: '1px solid #1e2130', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #1e2130' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <LayoutGrid size={16} color="white" />
+            <div style={{ width: 32, height: 32, background: '#0f1015', border: '1px solid #e11d4833', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 11 }}>
+                <span style={{ color: '#e11d48' }}>[</span><span style={{ color: '#f1f5f9' }}>PI</span><span style={{ color: '#e11d48' }}>]</span>
+              </span>
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0' }}>Content Hub</div>
-              <div style={{ fontSize: 11, color: '#475569' }}>Danas · Vabanque</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>🌿 Danas</div>
+              <div style={{ fontSize: 10, color: '#374151' }}>Organic AI Dropshipping</div>
             </div>
           </div>
         </div>
