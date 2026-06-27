@@ -317,12 +317,7 @@ export default function LandingPage() {
       {/* Main */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'48px 32px', position:'relative', zIndex:1 }}>
         <div style={{ marginBottom:52, textAlign:'center' }}>
-          <div style={{ fontSize:44, fontFamily:'monospace', fontWeight:900, letterSpacing:'-0.03em', lineHeight:1 }}>
-            <span style={{ color:'#e11d48', textShadow:'0 0 50px #e11d4850' }}>[</span>
-            <span style={{ color:'#f8fafc' }}>PlugInfo</span>
-            <span style={{ color:'#e11d48', textShadow:'0 0 50px #e11d4850' }}>]</span>
-          </div>
-          <div style={{ marginTop:10, fontSize:10, color:'#2d3340', textTransform:'uppercase', letterSpacing:'0.18em', fontWeight:700 }}>Content Hub</div>
+          <img src="/pluginfo-logo.png" alt="PlugInfo Content Hub" style={{ height:90, width:'auto', objectFit:'contain', display:'block', margin:'0 auto' }} />
         </div>
 
         <h1 style={{ fontSize:20, fontWeight:800, color:'#f1f5f9', margin:'0 0 6px', letterSpacing:'-0.02em' }}>Choose a workspace</h1>
