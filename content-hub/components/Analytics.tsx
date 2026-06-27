@@ -220,7 +220,7 @@ function VideoCard({
         {expanded && (
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #1e2130' }}>
             {video.publishedText && (
-              <div style={{ fontSize: 11, color: '#475569', marginBottom: 6 }}>📅 {video.publishedText}</div>
+              <div style={{ fontSize: 11, color: '#475569', marginBottom: 6 }}>📅 {video.publishedText.includes('T') ? new Date(video.publishedText).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : video.publishedText}</div>
             )}
             {video.lengthText && (
               <div style={{ fontSize: 11, color: '#475569', marginBottom: 6 }}>⏱ {video.lengthText}</div>
@@ -309,6 +309,7 @@ function FunnelRow({ label, videos, color }: { label: string; videos: VideoStat[
 export default function Analytics({ cards }: Props) {
   const [platform, setPlatform] = useState<Platform>('youtube');
   const [videos, setVideos] = useState<VideoStat[]>([]);
+  const [channelInfo, setChannelInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sort, setSort] = useState<SortKey>('views');
@@ -316,7 +317,6 @@ export default function Analytics({ cards }: Props) {
   const [filterFunnel, setFilterFunnel] = useState<'ALL' | 'TOF' | 'MOF' | 'BOF' | 'UNKNOWN'>('ALL');
   const [filterPlatform, setFilterPlatform] = useState<'all' | 'instagram'>('all');
 
-  // Match videos to pipeline cards by URL or title to get funnel type
   const cardsRef = React.useRef(cards);
   cardsRef.current = cards;
 
@@ -347,6 +347,7 @@ export default function Analytics({ cards }: Props) {
     setLoading(true);
     setError('');
     setVideos([]);
+    setChannelInfo(null);
     try {
       if (platform === 'youtube') {
         const res = await fetch('/api/scrape-youtube');
@@ -354,7 +355,8 @@ export default function Analytics({ cards }: Props) {
         if (data.error && !data.videos?.length) {
           setError(data.error);
         } else {
-          setVideos(enrichWithFunnelType(data.videos || []));
+          setVideos(enrichWithFunnelType((data.videos || []).map((v: any) => ({ ...v, publishedText: v.publishedAt || '' }))));
+          setChannelInfo(data.channel || null);
           setLastScraped(data.scrapedAt || '');
         }
       } else {
@@ -506,6 +508,27 @@ export default function Analytics({ cards }: Props) {
 
       {!loading && videos.length > 0 && (
         <>
+          {/* Channel header (YouTube only) */}
+          {platform === 'youtube' && channelInfo && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#0d0f14', border: '1px solid #1e2130', borderRadius: 14, padding: '16px 20px', marginBottom: 20 }}>
+              {channelInfo.thumbnail && (
+                <img src={channelInfo.thumbnail} alt={channelInfo.title} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid #1e2130' }} />
+              )}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#e2e8f0', marginBottom: 4 }}>{channelInfo.title}</div>
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>👥 <b style={{ color: '#e2e8f0' }}>{fmt(channelInfo.subscribers)}</b> subscribers</span>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>👁 <b style={{ color: '#e2e8f0' }}>{fmt(channelInfo.totalViews)}</b> total views</span>
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>🎬 <b style={{ color: '#e2e8f0' }}>{channelInfo.videoCount}</b> videos</span>
+                </div>
+              </div>
+              <a href={`https://www.youtube.com/@DanasBytautas`} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}>
+                <ExternalLink size={11} /> Open Channel
+              </a>
+            </div>
+          )}
+
           {/* Summary stats */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
             <StatBadge label="Total videos" value={videos.length.toString()} color="#e2e8f0" />
