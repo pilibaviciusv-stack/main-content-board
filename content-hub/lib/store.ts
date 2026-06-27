@@ -45,35 +45,59 @@ const DEFAULT_PIPELINES: Pipeline[] = [
   },
 ];
 
-// Prefix IDs with hub slug so each hub has isolated data in the same tables
-function scopeId(id: string, hub: string) {
-  return `${hub}__${id}`;
+// Danas uses legacy unprefixed IDs for backwards compatibility.
+// All other hubs use hub__ prefix.
+const DANAS_LEGACY = true;
+
+function dbPipelineId(pipelineId: string, hub: string): string {
+  if (hub === 'danas') return pipelineId; // legacy: no prefix
+  return `${hub}__${pipelineId}`;
+}
+
+function appPipelineId(dbId: string, hub: string): string {
+  if (hub === 'danas') return dbId;
+  return dbId.replace(`${hub}__`, '');
+}
+
+function wsKey(key: string, hub: string): string {
+  if (hub === 'danas') return key; // legacy: no prefix
+  return `${hub}__${key}`;
 }
 
 export async function loadState(hub = 'danas'): Promise<AppState> {
   try {
-    const prefix = `${hub}__`;
+    let pipelineRows: any[] | null = null;
 
-    // Load pipelines
-    const { data: pipelineRows } = await supabase
-      .from('pipelines')
-      .select('*')
-      .like('id', `${prefix}%`)
-      .order('created_at');
+    if (hub === 'danas') {
+      // Load legacy unprefixed pipelines
+      const { data } = await supabase
+        .from('pipelines')
+        .select('*')
+        .in('id', ['shortform', 'youtube', 'ig-stories'])
+        .order('created_at');
+      pipelineRows = data;
+    } else {
+      const prefix = `${hub}__`;
+      const { data } = await supabase
+        .from('pipelines')
+        .select('*')
+        .like('id', `${prefix}%`)
+        .order('created_at');
+      pipelineRows = data;
+    }
 
     let pipelines: Pipeline[];
     if (pipelineRows && pipelineRows.length > 0) {
       pipelines = pipelineRows.map(r => ({
-        id: r.id.replace(prefix, ''),
+        id: appPipelineId(r.id, hub),
         name: r.name,
         stages: r.stages,
       }));
     } else {
-      // Seed default pipelines for this hub
       pipelines = DEFAULT_PIPELINES;
       await supabase.from('pipelines').insert(
         DEFAULT_PIPELINES.map(p => ({
-          id: scopeId(p.id, hub),
+          id: dbPipelineId(p.id, hub),
           name: p.name,
           stages: p.stages,
         }))
@@ -81,30 +105,53 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
     }
 
     // Load cards
-    const { data: cardRows } = await supabase
-      .from('cards')
-      .select('*')
-      .like('id', `${prefix}%`)
-      .order('created_at');
+    let cardRows: any[] | null = null;
+    if (hub === 'danas') {
+      const { data } = await supabase
+        .from('cards')
+        .select('*')
+        .in('pipeline_id', ['shortform', 'youtube', 'ig-stories'])
+        .order('created_at');
+      cardRows = data;
+    } else {
+      const prefix = `${hub}__`;
+      const { data } = await supabase
+        .from('cards')
+        .select('*')
+        .like('pipeline_id', `${prefix}%`)
+        .order('created_at');
+      cardRows = data;
+    }
 
     const cards: ContentCard[] = cardRows
       ? cardRows.map(r => ({
           id: r.id,
-          pipelineId: r.pipeline_id.replace(prefix, ''),
+          pipelineId: appPipelineId(r.pipeline_id, hub),
           stageId: r.stage_id,
           title: r.title,
           ...r.data,
         }))
       : [];
 
-    // Load workspace items
-    const { data: workspaceRows } = await supabase
-      .from('workspace')
-      .select('*')
-      .like('key', `${prefix}%`);
+    // Load workspace
+    let workspaceRows: any[] | null = null;
+    if (hub === 'danas') {
+      const { data } = await supabase
+        .from('workspace')
+        .select('*')
+        .in('key', ['music_bank', 'footage_links', 'inspiration_profiles', 'excluded_videos']);
+      workspaceRows = data;
+    } else {
+      const prefix = `${hub}__`;
+      const { data } = await supabase
+        .from('workspace')
+        .select('*')
+        .like('key', `${prefix}%`);
+      workspaceRows = data;
+    }
 
     const ws = (workspaceRows || []).reduce((acc: any, row: any) => {
-      const shortKey = row.key.replace(prefix, '');
+      const shortKey = hub === 'danas' ? row.key : row.key.replace(`${hub}__`, '');
       acc[shortKey] = row.value;
       return acc;
     }, {});
@@ -131,23 +178,28 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
 }
 
 export async function savePipelines(pipelines: Pipeline[], hub = 'danas') {
-  const prefix = `${hub}__`;
+  const prefix = hub === 'danas' ? '' : `${hub}__`;
   for (const p of pipelines) {
     await supabase.from('pipelines').upsert({
-      id: scopeId(p.id, hub),
+      id: dbPipelineId(p.id, hub),
       name: p.name,
       stages: p.stages,
     });
   }
-  const { data: existing } = await supabase
-    .from('pipelines')
-    .select('id')
-    .like('id', `${prefix}%`);
-  const existingIds = (existing || []).map((r: any) => r.id);
-  const currentIds = pipelines.map(p => scopeId(p.id, hub));
-  const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
-  if (toDelete.length > 0) {
-    await supabase.from('pipelines').delete().in('id', toDelete);
+  // Delete removed pipelines scoped to this hub
+  if (hub === 'danas') {
+    const { data: existing } = await supabase.from('pipelines').select('id').in('id', ['shortform', 'youtube', 'ig-stories']);
+    const existingIds = (existing || []).map((r: any) => r.id);
+    const currentIds = pipelines.map(p => p.id);
+    const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
+    if (toDelete.length > 0) await supabase.from('pipelines').delete().in('id', toDelete);
+  } else {
+    const pfx = `${hub}__`;
+    const { data: existing } = await supabase.from('pipelines').select('id').like('id', `${pfx}%`);
+    const existingIds = (existing || []).map((r: any) => r.id);
+    const currentIds = pipelines.map(p => dbPipelineId(p.id, hub));
+    const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
+    if (toDelete.length > 0) await supabase.from('pipelines').delete().in('id', toDelete);
   }
 }
 
@@ -155,7 +207,7 @@ export async function saveCard(card: ContentCard, hub = 'danas') {
   const { id, pipelineId, stageId, title, ...rest } = card;
   await supabase.from('cards').upsert({
     id,
-    pipeline_id: scopeId(pipelineId, hub),
+    pipeline_id: dbPipelineId(pipelineId, hub),
     stage_id: stageId,
     title,
     data: rest,
@@ -168,5 +220,5 @@ export async function deleteCard(id: string) {
 }
 
 export async function saveWorkspaceKey(key: string, value: any, hub = 'danas') {
-  await supabase.from('workspace').upsert({ key: `${hub}__${key}`, value });
+  await supabase.from('workspace').upsert({ key: wsKey(key, hub), value });
 }
