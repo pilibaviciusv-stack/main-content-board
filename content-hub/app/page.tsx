@@ -17,8 +17,8 @@ const DEFAULT_HUBS: HubMeta[] = [
 
 const HUB_SLUGS = ['danas', 'vainius', 'joris'];
 
-const RED_PALETTE: [number,number,number][] = [
-  [180,30,30],[200,40,40],[160,20,20],[220,50,50],[140,15,15],[190,35,35],[210,45,45],
+const GRAY_PALETTE: [number,number,number][] = [
+  [60,60,65],[75,75,80],[50,50,55],[85,85,90],[45,45,50],[70,70,75],[55,55,60],
 ];
 
 function BubbleCanvas() {
@@ -30,18 +30,21 @@ function BubbleCanvas() {
   const init = useCallback((canvas: HTMLCanvasElement) => {
     const W = canvas.width = canvas.offsetWidth;
     const H = canvas.height = canvas.offsetHeight;
-    const count = Math.max(14, Math.floor((W * H) / 16000));
+    const count = Math.max(8, Math.floor((W * H) / 60000));
     bubblesRef.current = Array.from({ length: count }, () => {
-      const [r,g,b] = RED_PALETTE[Math.floor(Math.random() * RED_PALETTE.length)];
-      const radius = 20 + Math.random() * 55;
+      const [r,g,b] = GRAY_PALETTE[Math.floor(Math.random() * GRAY_PALETTE.length)];
+      const radius = 120 + Math.random() * 220;
       return {
         x: Math.random() * W, y: Math.random() * H,
-        vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+        vx: (Math.random() - 0.5) * 0.18, vy: (Math.random() - 0.5) * 0.18,
         r: radius, g: Math.random() * Math.PI * 2,
-        gs: 0.003 + Math.random() * 0.008,
-        ga: 0.38 + Math.random() * 0.32,
+        gs: 0.001 + Math.random() * 0.003,
+        ga: 0.10 + Math.random() * 0.12,
         color: [r, g, b] as [number,number,number],
         px: 0, py: 0,
+        // organic blob: 4-6 radial noise points
+        blobSeeds: Array.from({ length: 5 }, () => Math.random() * Math.PI * 2),
+        blobAmp: 0.18 + Math.random() * 0.22,
       };
     });
   }, []);
@@ -93,17 +96,27 @@ function BubbleCanvas() {
         b.x += b.px * 0.07; b.y += b.py * 0.07;
 
         const [r, g2, bl] = b.color;
-        const grd = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.05, b.x, b.y, b.r);
-        grd.addColorStop(0, `rgba(${r+50},${g2+20},${bl+20},${b.ga})`);
-        grd.addColorStop(0.5, `rgba(${r},${g2},${bl},${b.ga * 0.7})`);
-        grd.addColorStop(1, `rgba(${Math.max(0,r-40)},0,0,0)`);
+        const grd = ctx.createRadialGradient(b.x - b.r * 0.2, b.y - b.r * 0.2, b.r * 0.05, b.x, b.y, b.r);
+        grd.addColorStop(0, `rgba(${r+20},${g2+20},${bl+20},${b.ga})`);
+        grd.addColorStop(0.5, `rgba(${r},${g2},${bl},${b.ga * 0.6})`);
+        grd.addColorStop(1, `rgba(${r},${g2},${bl},0)`);
+
+        // organic blob shape using bezier curves around a perturbed circle
+        const steps = 8;
         ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        for (let i = 0; i <= steps; i++) {
+          const angle = (i / steps) * Math.PI * 2;
+          const seed = b.blobSeeds[i % b.blobSeeds.length];
+          const noise = 1 + b.blobAmp * Math.sin(angle * 2.3 + seed + b.g * 0.7) * Math.cos(angle * 1.7 + seed * 1.3 + b.g * 0.4);
+          const rr = b.r * noise;
+          const px2 = b.x + Math.cos(angle) * rr;
+          const py2 = b.y + Math.sin(angle) * rr;
+          if (i === 0) ctx.moveTo(px2, py2);
+          else ctx.lineTo(px2, py2);
+        }
+        ctx.closePath();
         ctx.fillStyle = grd;
         ctx.fill();
-        ctx.strokeStyle = `rgba(${r+60},${g2+30},${bl+30},0.12)`;
-        ctx.lineWidth = 1;
-        ctx.stroke();
       }
       rafRef.current = requestAnimationFrame(draw);
     };
@@ -317,7 +330,7 @@ export default function LandingPage() {
       {/* Main */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'48px 32px', position:'relative', zIndex:1 }}>
         <div style={{ marginBottom:52, textAlign:'center' }}>
-          <img src="/pluginfo-logo.png" alt="PlugInfo Content Hub" style={{ height:90, width:'auto', objectFit:'contain', display:'block', margin:'0 auto' }} />
+          <img src="/pluginfo-logo.png" alt="PlugInfo Content Hub" style={{ height:160, width:'auto', objectFit:'contain', display:'block', margin:'0 auto' }} />
         </div>
 
         <h1 style={{ fontSize:20, fontWeight:800, color:'#f1f5f9', margin:'0 0 6px', letterSpacing:'-0.02em' }}>Choose a workspace</h1>
