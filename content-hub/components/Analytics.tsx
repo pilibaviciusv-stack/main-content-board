@@ -30,7 +30,7 @@ interface Props {
 }
 
 type Platform = 'youtube' | 'shortform';
-type SortKey = 'views' | 'likes' | 'comments' | 'published';
+type SortKey = 'views' | 'likes' | 'comments' | 'latest';
 
 function fmt(n: number): string {
   if (!n || isNaN(n)) return '0';
@@ -258,7 +258,74 @@ function StatBadge({ label, value, color, sub }: { label: string; value: string;
   );
 }
 
-function FunnelRow({ label, videos, color }: { label: string; videos: VideoStat[]; color: string }) {
+function ViewsGrowthChart({ videos }: { videos: VideoStat[] }) {
+  if (videos.length < 2) return null;
+
+  // Sort by date oldest→newest for chart
+  const sorted = [...videos]
+    .filter(v => v.publishedText)
+    .sort((a, b) => new Date(a.publishedText).getTime() - new Date(b.publishedText).getTime())
+    .slice(-30); // last 30 videos
+
+  if (sorted.length < 2) return null;
+
+  const maxV = Math.max(...sorted.map(v => v.views));
+  const W = 100, H = 60;
+  const pad = 4;
+
+  const points = sorted.map((v, i) => {
+    const x = pad + (i / (sorted.length - 1)) * (W - pad * 2);
+    const y = H - pad - ((v.views / maxV) * (H - pad * 2));
+    return { x, y, v };
+  });
+
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const areaD = `${pathD} L ${points[points.length-1].x} ${H} L ${points[0].x} ${H} Z`;
+
+  const avgV = Math.round(avg(sorted.map(v => v.views)));
+  const avgY = H - pad - ((avgV / maxV) * (H - pad * 2));
+
+  return (
+    <div style={{ background: '#0d0f14', border: '1px solid #1e2130', borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Views per video — last {sorted.length} uploads
+        </div>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <span style={{ fontSize: 11, color: '#6366f1' }}>● Avg: {fmt(avgV)}</span>
+          <span style={{ fontSize: 11, color: '#f59e0b' }}>● Peak: {fmt(maxV)}</span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 120, overflow: 'visible' }}>
+        <defs>
+          <linearGradient id="viewsGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Avg line */}
+        <line x1={pad} y1={avgY} x2={W - pad} y2={avgY} stroke="#6366f1" strokeWidth="0.4" strokeDasharray="1,1" />
+        {/* Area fill */}
+        <path d={areaD} fill="url(#viewsGrad)" />
+        {/* Line */}
+        <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" />
+        {/* Dots + tooltips */}
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r="1.2" fill={p.v.views >= avgV * 2 ? '#4ade80' : p.v.views <= avgV * 0.4 ? '#f87171' : '#6366f1'} />
+            <title>{p.v.title?.slice(0, 40)}: {fmt(p.v.views)} views</title>
+          </g>
+        ))}
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        <span style={{ fontSize: 9, color: '#334155' }}>{sorted[0]?.publishedText ? new Date(sorted[0].publishedText).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : ''}</span>
+        <span style={{ fontSize: 9, color: '#334155' }}>{sorted[sorted.length-1]?.publishedText ? new Date(sorted[sorted.length-1].publishedText).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : ''}</span>
+      </div>
+    </div>
+  );
+}
+
+
   if (!videos.length) return null;
   const avgV = Math.round(avg(videos.map(v => v.views)));
   const maxV = Math.max(...videos.map(v => v.views));
@@ -312,7 +379,7 @@ export default function Analytics({ cards }: Props) {
   const [channelInfo, setChannelInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [sort, setSort] = useState<SortKey>('views');
+  const [sort, setSort] = useState<SortKey>('latest');
   const [lastScraped, setLastScraped] = useState('');
   const [filterFunnel, setFilterFunnel] = useState<'ALL' | 'TOF' | 'MOF' | 'BOF' | 'UNKNOWN'>('ALL');
   const [filterPlatform, setFilterPlatform] = useState<'all' | 'instagram'>('all');
@@ -393,6 +460,7 @@ export default function Analytics({ cards }: Props) {
     if (sort === 'views') return b.views - a.views;
     if (sort === 'likes') return b.likes - a.likes;
     if (sort === 'comments') return b.comments - a.comments;
+    if (sort === 'latest') return new Date(b.publishedText).getTime() - new Date(a.publishedText).getTime();
     return 0;
   });
 
@@ -557,6 +625,9 @@ export default function Analytics({ cards }: Props) {
             </div>
           )}
 
+          {/* Views growth chart */}
+          {platform === 'youtube' && <ViewsGrowthChart videos={videos} />}
+
           {/* Filters + sort */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ fontSize: 11, color: '#475569', marginRight: 4 }}>Filter:</div>
@@ -570,9 +641,9 @@ export default function Analytics({ cards }: Props) {
             <div style={{ flex: 1 }} />
 
             <div style={{ fontSize: 11, color: '#475569' }}>Sort:</div>
-            {(['views', 'likes', 'comments'] as SortKey[]).map(s => (
+            {(['latest', 'views', 'likes', 'comments'] as SortKey[]).map(s => (
               <button key={s} onClick={() => setSort(s)} style={chipStyle(sort === s, '#6366f1')}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
+                {s === 'latest' ? '🕐 Latest' : s.charAt(0).toUpperCase() + s.slice(1)}
               </button>
             ))}
           </div>
