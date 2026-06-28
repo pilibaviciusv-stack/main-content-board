@@ -48,6 +48,21 @@ const isShortform = (name: string) =>
 // Mock logged-in user - in real app this would come from auth
 const CURRENT_USER = { email: 'danas@pluginfo.com', isOwner: true };
 
+function getHubUserSession() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('hub_user_session');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    // Expire after 7 days
+    if (Date.now() - session.loginAt > 7 * 24 * 60 * 60 * 1000) {
+      localStorage.removeItem('hub_user_session');
+      return null;
+    }
+    return session;
+  } catch { return null; }
+}
+
 export default function HubPage() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,11 +70,19 @@ export default function HubPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedPipelines, setExpandedPipelines] = useState<Set<string>>(new Set());
   const [insightsExpanded, setInsightsExpanded] = useState(false);
+  const [hubUserSession, setHubUserSession] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
+    const session = getHubUserSession();
+    setHubUserSession(session);
+    // If hub user session exists but for wrong hub, redirect to their hub
+    if (session && session.hub !== HUB) {
+      router.push(`/hub/${session.hub}`);
+      return;
+    }
     loadState(HUB).then((s: AppState) => { setState(s); setLoading(false); });
-  }, []);
+  }, [router]);
 
   const handleCardSave = useCallback(async (card: ContentCard) => {
     setState((prev: AppState | null) => prev ? { ...prev, cards: prev.cards.map((c: ContentCard) => c.id === card.id ? card : c) } : prev);
@@ -173,6 +196,18 @@ export default function HubPage() {
 
   const insightsActive = view.type === 'insights' || view.type === 'analytics';
 
+  // Permission filtering for hub users
+  const isHubUser = !!hubUserSession;
+  const perms = hubUserSession?.permissions;
+  const visiblePipelines = isHubUser && !perms?.isAdmin
+    ? state.pipelines.filter((p: Pipeline) => perms?.pipelineIds?.includes(p.id))
+    : state.pipelines;
+  const canViewInsights = !isHubUser || perms?.isAdmin || perms?.canViewInsights;
+  const canViewMusic = !isHubUser || perms?.isAdmin || perms?.canViewMusic;
+  const canViewFootage = !isHubUser || perms?.isAdmin || perms?.canViewFootage;
+  const canViewInspiration = !isHubUser || perms?.isAdmin || perms?.canViewInspiration;
+  const canViewAdmin = !isHubUser || perms?.isAdmin;
+
   const sidebarInner = (
     <>
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #1e2130' }}>
@@ -191,6 +226,7 @@ export default function HubPage() {
 
       <div style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
         {/* Main Insights — collapsible in sidebar */}
+        {canViewInsights && (
         <button
           onClick={() => {
             if (!insightsExpanded) {
@@ -212,9 +248,10 @@ export default function HubPage() {
           <span style={{ flex: 1 }}>Main Insights</span>
           {insightsExpanded ? <ChevronDown size={12} style={{ opacity: 0.5 }} /> : <ChevronRight size={12} style={{ opacity: 0.5 }} />}
         </button>
+        )}
 
         {/* Analytics + member insights sub-items — only when expanded */}
-        {insightsExpanded && (
+        {canViewInsights && insightsExpanded && (
           <>
             {navBtn('Analytics', <TrendingUp size={12} />, view.type === 'analytics', () => navigate({ type: 'analytics' }), true)}
           </>
@@ -223,7 +260,7 @@ export default function HubPage() {
         <div style={{ height: 16 }} />
         <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pipelines</div>
 
-        {state.pipelines.map((p: Pipeline) => {
+        {visiblePipelines.map((p: Pipeline) => {
           const isExpanded = expandedPipelines.has(p.id);
           const isPipelineActive = view.type === 'pipeline' && (view as any).id === p.id;
           const hasYT = isYoutube(p.name);
@@ -266,15 +303,25 @@ export default function HubPage() {
 
         <div style={{ marginTop: 16 }}>
           <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Workspace</div>
-          {navBtn('Music Bank', <Music size={14} />, view.type === 'music', () => navigate({ type: 'music' }))}
-          {navBtn('Footage Links', <Film size={14} />, view.type === 'footage', () => navigate({ type: 'footage' }))}
-          {navBtn('Inspiration', <Users size={14} />, view.type === 'inspiration', () => navigate({ type: 'inspiration' }))}
+          {canViewMusic && navBtn('Music Bank', <Music size={14} />, view.type === 'music', () => navigate({ type: 'music' }))}
+          {canViewFootage && navBtn('Footage Links', <Film size={14} />, view.type === 'footage', () => navigate({ type: 'footage' }))}
+          {canViewInspiration && navBtn('Inspiration', <Users size={14} />, view.type === 'inspiration', () => navigate({ type: 'inspiration' }))}
         </div>
-        <div style={{ marginTop: 16 }}>
-          <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Admin</div>
-          {navBtn('Pipelines', <Settings size={14} />, view.type === 'settings', () => navigate({ type: 'settings' }))}
-          {navBtn('Team Access', <Shield size={14} />, view.type === 'admin', () => navigate({ type: 'admin' }))}
-        </div>
+        {canViewAdmin && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Admin</div>
+            {navBtn('Pipelines', <Settings size={14} />, view.type === 'settings', () => navigate({ type: 'settings' }))}
+            {navBtn('Team Access', <Shield size={14} />, view.type === 'admin', () => navigate({ type: 'admin' }))}
+          </div>
+        )}
+        {isHubUser && (
+          <div style={{ marginTop: 16, padding: '0 8px' }}>
+            <button onClick={() => { localStorage.removeItem('hub_user_session'); window.location.href = '/login'; }}
+              style={{ width: '100%', background: 'none', border: '1px solid #1e2130', borderRadius: 8, padding: '7px 12px', color: '#475569', cursor: 'pointer', fontSize: 12, textAlign: 'left' }}>
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

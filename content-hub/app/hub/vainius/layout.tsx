@@ -4,10 +4,25 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function HubLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+
+  const handleBack = () => {
+    // Hub users (non-Supabase) don't have a hub selector — just go to login/home safely
+    const rawSession = typeof window !== 'undefined' ? localStorage.getItem('hub_user_session') : null;
+    if (rawSession) {
+      // Hub users: sign out and go to login
+      if (confirm('Sign out?')) {
+        localStorage.removeItem('hub_user_session');
+        router.push('/login');
+      }
+    } else {
+      router.push('/');
+    }
+  };
+
   return (
     <div style={{ position: 'relative' }}>
       <button
-        onClick={() => router.push('/')}
+        onClick={handleBack}
         style={{
           position: 'fixed', top: 14, right: 16, zIndex: 1000,
           display: 'flex', alignItems: 'center', gap: 6,
