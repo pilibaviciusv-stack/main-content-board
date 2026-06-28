@@ -69,11 +69,12 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
     let pipelineRows: any[] | null = null;
 
     if (hub === 'danas') {
-      // Load legacy unprefixed pipelines
+      // Load ALL pipelines that don't have a hub__ prefix (legacy danas pipelines + any new ones created for danas)
       const { data } = await supabase
         .from('pipelines')
         .select('*')
-        .in('id', ['shortform', 'youtube', 'ig-stories'])
+        .not('id', 'like', 'joris__%')
+        .not('id', 'like', 'vainius__%')
         .order('created_at');
       pipelineRows = data;
     } else {
@@ -107,10 +108,12 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
     // Load cards
     let cardRows: any[] | null = null;
     if (hub === 'danas') {
+      // Load cards for ALL danas pipelines (no hub prefix)
       const { data } = await supabase
         .from('cards')
         .select('*')
-        .in('pipeline_id', ['shortform', 'youtube', 'ig-stories'])
+        .not('pipeline_id', 'like', 'joris__%')
+        .not('pipeline_id', 'like', 'vainius__%')
         .order('created_at');
       cardRows = data;
     } else {
@@ -180,7 +183,6 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
 }
 
 export async function savePipelines(pipelines: Pipeline[], hub = 'danas') {
-  const prefix = hub === 'danas' ? '' : `${hub}__`;
   for (const p of pipelines) {
     await supabase.from('pipelines').upsert({
       id: dbPipelineId(p.id, hub),
@@ -190,9 +192,14 @@ export async function savePipelines(pipelines: Pipeline[], hub = 'danas') {
   }
   // Delete removed pipelines scoped to this hub
   if (hub === 'danas') {
-    const { data: existing } = await supabase.from('pipelines').select('id').in('id', ['shortform', 'youtube', 'ig-stories']);
+    // Load ALL danas pipelines (no hub prefix, excluding other hubs)
+    const { data: existing } = await supabase
+      .from('pipelines')
+      .select('id')
+      .not('id', 'like', 'joris__%')
+      .not('id', 'like', 'vainius__%');
     const existingIds = (existing || []).map((r: any) => r.id);
-    const currentIds = pipelines.map(p => p.id);
+    const currentIds = pipelines.map(p => p.id); // danas uses raw id (no prefix)
     const toDelete = existingIds.filter((id: string) => !currentIds.includes(id));
     if (toDelete.length > 0) await supabase.from('pipelines').delete().in('id', toDelete);
   } else {
