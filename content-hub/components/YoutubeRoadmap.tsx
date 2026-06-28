@@ -71,19 +71,20 @@ export default function YoutubeRoadmap({ pipeline, cards, users, onCardsChange, 
   };
 
   // Bigger card dimensions for PC
-  const CARD_W = 420;
-  const THUMB_H = 236; // 16:9 ratio for 420px width
-  const CARD_H = THUMB_H + 80; // thumbnail + info area
-  const COL_GAP = 140;
-  const ROW_GAP = 40;
+  const CARD_W = 460;
+  const THUMB_H = 259; // 16:9 ratio for 460px width
+  const CARD_H = THUMB_H + 90; // thumbnail + info area
+  const COL_GAP = 120;
+  const ROW_GAP = 48;
   const RIGHT_X = CARD_W + COL_GAP;
   const CENTER_X = CARD_W + COL_GAP / 2;
   const totalHeight = pipelineCards.length * (CARD_H + ROW_GAP) + 40;
+  const TOTAL_W = RIGHT_X + CARD_W; // ~1040px
 
   return (
     <>
-      <div style={{ width: '100%' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 40, maxWidth: RIGHT_X + CARD_W, margin: '0 auto 40px' }}>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: TOTAL_W, maxWidth: '100%', marginBottom: 40 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
@@ -113,10 +114,10 @@ export default function YoutubeRoadmap({ pipeline, cards, users, onCardsChange, 
         )}
 
         {pipelineCards.length > 0 && (
-          <div style={{ position: 'relative', width: RIGHT_X + CARD_W, margin: '0 auto', overflow: 'visible' }}>
+          <div style={{ position: 'relative', width: TOTAL_W, maxWidth: '100%', overflow: 'visible' }}>
             <svg
               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: totalHeight, pointerEvents: 'none', overflow: 'visible' }}
-              viewBox={`0 0 ${RIGHT_X + CARD_W} ${totalHeight}`}
+              viewBox={`0 0 ${TOTAL_W} ${totalHeight}`}
             >
               {pipelineCards.map((card, i) => {
                 if (i >= pipelineCards.length - 1) return null;

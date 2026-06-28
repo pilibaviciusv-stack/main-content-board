@@ -41,15 +41,20 @@ function getPipelineIcon(name: string) {
 }
 
 const isYoutube = (name: string) => name.toLowerCase().includes('youtube') || name.toLowerCase().includes('yt');
-const isShortform = (name: string) => name.toLowerCase().includes('short') || name.toLowerCase().includes('reel') || name.toLowerCase().includes('tiktok');
+const isShortform = (name: string) =>
+  name.toLowerCase().includes('short') || name.toLowerCase().includes('reel') ||
+  name.toLowerCase().includes('tiktok') || name.toLowerCase().includes('clip');
+
+// Mock logged-in user - in real app this would come from auth
+const CURRENT_USER = { email: 'danas@pluginfo.com', isOwner: true };
 
 export default function HubPage() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>({ type: 'insights' });
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Expanded pipeline nav items
   const [expandedPipelines, setExpandedPipelines] = useState<Set<string>>(new Set());
+  const [insightsExpanded, setInsightsExpanded] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -166,6 +171,8 @@ export default function HubPage() {
     return 'Settings';
   };
 
+  const insightsActive = view.type === 'insights' || view.type === 'analytics';
+
   const sidebarInner = (
     <>
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid #1e2130' }}>
@@ -183,20 +190,35 @@ export default function HubPage() {
       </div>
 
       <div style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
-        {/* Main Insights — clicking expands analytics underneath */}
-        <button onClick={() => navigate({ type: 'insights' })} style={{
-          display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
-          borderRadius: 8, background: view.type === 'insights' || view.type === 'analytics' ? '#1e2130' : 'none', border: 'none',
-          color: view.type === 'insights' || view.type === 'analytics' ? '#e2e8f0' : '#64748b',
-          cursor: 'pointer', fontSize: 13, fontWeight: view.type === 'insights' || view.type === 'analytics' ? 600 : 400,
-          width: '100%', textAlign: 'left', transition: 'all 0.15s',
-        }}>
+        {/* Main Insights — collapsible in sidebar */}
+        <button
+          onClick={() => {
+            if (!insightsExpanded) {
+              setInsightsExpanded(true);
+              navigate({ type: 'insights' });
+            } else {
+              setInsightsExpanded(false);
+            }
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
+            borderRadius: 8, background: insightsActive ? '#1e2130' : 'none', border: 'none',
+            color: insightsActive ? '#e2e8f0' : '#64748b',
+            cursor: 'pointer', fontSize: 13, fontWeight: insightsActive ? 600 : 400,
+            width: '100%', textAlign: 'left', transition: 'all 0.15s',
+          }}
+        >
           <BarChart2 size={14} />
           <span style={{ flex: 1 }}>Main Insights</span>
-          <ChevronDown size={12} style={{ opacity: 0.5 }} />
+          {insightsExpanded ? <ChevronDown size={12} style={{ opacity: 0.5 }} /> : <ChevronRight size={12} style={{ opacity: 0.5 }} />}
         </button>
-        {/* Analytics always visible under insights */}
-        {navBtn('Analytics', <TrendingUp size={12} />, view.type === 'analytics', () => navigate({ type: 'analytics' }), true)}
+
+        {/* Analytics + member insights sub-items — only when expanded */}
+        {insightsExpanded && (
+          <>
+            {navBtn('Analytics', <TrendingUp size={12} />, view.type === 'analytics', () => navigate({ type: 'analytics' }), true)}
+          </>
+        )}
 
         <div style={{ height: 16 }} />
         <div style={{ padding: '0 12px 6px', fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pipelines</div>
@@ -204,12 +226,17 @@ export default function HubPage() {
         {state.pipelines.map((p: Pipeline) => {
           const isExpanded = expandedPipelines.has(p.id);
           const isPipelineActive = view.type === 'pipeline' && (view as any).id === p.id;
-          const hasSubViews = isYoutube(p.name) || isShortform(p.name) || (!isYoutube(p.name) && !p.name.toLowerCase().includes('stor'));
+          const hasYT = isYoutube(p.name);
+          const hasSF = isShortform(p.name);
+          const hasSubViews = hasYT || hasSF;
           return (
             <div key={p.id}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <button
-                  onClick={() => { navigate({ type: 'pipeline', id: p.id }); if (hasSubViews) togglePipelineExpand(p.id); }}
+                  onClick={() => {
+                    navigate({ type: 'pipeline', id: p.id });
+                    if (hasSubViews) togglePipelineExpand(p.id);
+                  }}
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
                     borderRadius: 8, background: isPipelineActive ? '#1e2130' : 'none', border: 'none',
@@ -226,12 +253,11 @@ export default function HubPage() {
                   )}
                 </button>
               </div>
-              {/* Sub-views: only visible when expanded */}
+              {/* Sub-views only visible when pipeline expanded */}
               {isExpanded && (
                 <>
-                  {isYoutube(p.name) && navBtn('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => navigate({ type: 'roadmap', pipelineId: p.id }), true)}
-                  {(isShortform(p.name) || (!isYoutube(p.name) && !p.name.toLowerCase().includes('stor'))) &&
-                    navBtn('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)}
+                  {hasYT && navBtn('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => navigate({ type: 'roadmap', pipelineId: p.id }), true)}
+                  {hasSF && navBtn('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)}
                 </>
               )}
             </div>
@@ -319,6 +345,7 @@ export default function HubPage() {
               pipelines={state.pipelines}
               hub={HUB}
               onChange={handleHubUsersChange}
+              onPipelinesChange={handlePipelinesChange}
             />
           )}
         </div>

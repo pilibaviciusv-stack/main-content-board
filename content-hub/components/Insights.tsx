@@ -41,7 +41,6 @@ function CollapsibleSection({ title, children, defaultOpen = true }: { title: st
 export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
   const now = new Date();
 
-  // Per-pipeline total cards
   const shortformPipelines = pipelines.filter(p =>
     p.name.toLowerCase().includes('short') || p.name.toLowerCase().includes('reel') || p.name.toLowerCase().includes('tiktok')
   );
@@ -55,49 +54,42 @@ export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
   const shortformCards = cards.filter(c => shortformPipelines.some(p => p.id === c.pipelineId));
   const youtubeCards = cards.filter(c => youtubePipelines.some(p => p.id === c.pipelineId));
 
-  // Posted cards
   const postedCards = cards.filter(c => {
     const pipeline = pipelines.find(p => p.id === c.pipelineId);
     const stage = pipeline?.stages.find(s => s.id === c.stageId);
     return stage?.name.toLowerCase().includes('posted') || stage?.name.toLowerCase().includes('scheduled');
   });
 
-  // In editing
   const editingCards = cards.filter(c => {
     const pipeline = pipelines.find(p => p.id === c.pipelineId);
     const stage = pipeline?.stages.find(s => s.id === c.stageId);
     return stage?.name.toLowerCase().includes('editing') && !stage?.name.toLowerCase().includes('ready');
   });
 
-  // Ready to film
   const readyToFilm = cards.filter(c => {
     const pipeline = pipelines.find(p => p.id === c.pipelineId);
     const stage = pipeline?.stages.find(s => s.id === c.stageId);
     return stage?.name.toLowerCase().includes('ready to film');
   });
 
-  // Ideas
   const ideaCards = cards.filter(c => {
     const pipeline = pipelines.find(p => p.id === c.pipelineId);
     const stage = pipeline?.stages.find(s => s.id === c.stageId);
     return stage?.name.toLowerCase().includes('idea');
   });
 
-  // Ready for editing
   const readyForEditing = cards.filter(c => {
     const pipeline = pipelines.find(p => p.id === c.pipelineId);
     const stage = pipeline?.stages.find(s => s.id === c.stageId);
     return stage?.name.toLowerCase().includes('ready for editing');
   });
 
-  // Cards scheduled this week
   const scheduledThisWeek = cards.filter(c => {
     if (!c.scheduledDate) return false;
     const d = new Date(c.scheduledDate);
     return d >= now && d <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   });
 
-  // Per-pipeline breakdown
   const pipelineBreakdowns = pipelines.map(pipeline => {
     const pCards = cards.filter(c => c.pipelineId === pipeline.id);
     const stageBreakdown = pipeline.stages.map(stage => ({
@@ -106,16 +98,8 @@ export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
     return { pipeline, total: pCards.length, stageBreakdown };
   });
 
-  // Editor workload
   const editorMap: Record<string, number> = {};
   cards.forEach(c => { if (c.editor) editorMap[c.editor] = (editorMap[c.editor] || 0) + 1; });
-
-  // Content type split
-  const typeMap: Record<string, number> = { 'Top of Funnel': 0, 'Middle of Funnel': 0, 'Bottom of Funnel': 0 };
-  cards.forEach(c => { typeMap[c.type] = (typeMap[c.type] || 0) + 1; });
-  const TYPE_COLORS: Record<string, string> = {
-    'Top of Funnel': '#6366f1', 'Middle of Funnel': '#f59e0b', 'Bottom of Funnel': '#22c55e',
-  };
 
   const pill = (label: string, color: string) => (
     <span style={{ fontSize: 11, fontWeight: 700, background: color + '22', color, padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
@@ -134,10 +118,9 @@ export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
   return (
     <div style={{ maxWidth: 960 }}>
 
-      {/* Main Insights — collapsible */}
+      {/* Overview — collapsible, open by default */}
       <CollapsibleSection title="Overview" defaultOpen={true}>
-        {/* Total cards per pipeline type */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
           {shortformPipelines.length > 0 && (
             <StatCard label="Total Shortform Cards" value={shortformCards.length} sub={shortformPipelines.map(p => p.name).join(', ')} />
           )}
@@ -154,7 +137,6 @@ export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
           <StatCard label="Posted" value={postedCards.length} sub="live or scheduled" color="#64748b" />
         </div>
 
-        {/* Scheduled this week */}
         {scheduledThisWeek.length > 0 && (
           <>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '24px 0 12px' }}>Scheduled This Week</div>
@@ -184,7 +166,7 @@ export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
         )}
       </CollapsibleSection>
 
-      {/* Analytics section — collapsible, closed by default */}
+      {/* Pipeline Breakdown */}
       <CollapsibleSection title="Pipeline Breakdown" defaultOpen={false}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {pipelineBreakdowns.map(({ pipeline, total, stageBreakdown }) => (
@@ -234,30 +216,7 @@ export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
         </CollapsibleSection>
       )}
 
-      {/* Content type split */}
-      <CollapsibleSection title="Content Type Split" defaultOpen={false}>
-        <div style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 12, padding: '18px 20px' }}>
-          <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
-            {Object.entries(typeMap).map(([type, count]) => (
-              <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 10, height: 10, borderRadius: 2, background: TYPE_COLORS[type] }} />
-                <span style={{ fontSize: 12, color: '#94a3b8' }}>{type}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{count}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ height: 8, background: '#1e2130', borderRadius: 4, overflow: 'hidden', display: 'flex' }}>
-            {Object.entries(typeMap).map(([type, count]) => {
-              const pct = cards.length > 0 ? (count / cards.length) * 100 : 0;
-              return pct > 0 ? (
-                <div key={type} style={{ height: '100%', width: `${pct}%`, background: TYPE_COLORS[type] }} />
-              ) : null;
-            })}
-          </div>
-        </div>
-      </CollapsibleSection>
-
-      {/* Per-member insights (for hub users with pipelines assigned) */}
+      {/* Per-member insights — collapsible, closed by default */}
       {hubUsers.length > 0 && (
         <CollapsibleSection title="Team Member Insights" defaultOpen={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -283,7 +242,7 @@ export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
                     </div>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{member.name}</div>
-                      <div style={{ fontSize: 11, color: '#475569' }}>{memberPipelines.map(p => p.name).join(', ')}</div>
+                      <div style={{ fontSize: 11, color: '#475569' }}>{memberPipelines.map((p: any) => p.name).join(', ')}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 16 }}>
