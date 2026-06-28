@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { AppState, Pipeline, ContentCard } from './types';
+import { AppState, Pipeline, ContentCard, HubUser } from './types';
 
 const DEFAULT_PIPELINES: Pipeline[] = [
   {
@@ -163,6 +163,7 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
       footageLinks: ws.footage_links || [],
       inspirationProfiles: ws.inspiration_profiles || [],
       users: ['Vainius', 'Danas'],
+      hubUsers: ws.hub_users || [],
     };
   } catch (err) {
     console.error('loadState error:', err);
@@ -173,6 +174,7 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
       footageLinks: [],
       inspirationProfiles: [],
       users: ['Vainius', 'Danas'],
+      hubUsers: [],
     };
   }
 }
@@ -221,4 +223,8 @@ export async function deleteCard(id: string) {
 
 export async function saveWorkspaceKey(key: string, value: any, hub = 'danas') {
   await supabase.from('workspace').upsert({ key: wsKey(key, hub), value });
+}
+
+export async function saveHubUsers(hubUsers: HubUser[], hub = 'danas') {
+  await saveWorkspaceKey('hub_users', hubUsers, hub);
 }

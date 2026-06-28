@@ -1,5 +1,24 @@
 export type CardType = 'Top of Funnel' | 'Middle of Funnel' | 'Bottom of Funnel';
 
+export interface HubUserPermissions {
+  pipelineIds: string[];   // which pipelines they can see
+  canViewInsights: boolean;
+  canViewMusic: boolean;
+  canViewFootage: boolean;
+  canViewInspiration: boolean;
+  isAdmin: boolean;
+}
+
+export interface HubUser {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string; // simple plain-text for now (no sensitive data)
+  hub: string;
+  permissions: HubUserPermissions;
+  createdAt: string;
+}
+
 export interface ContentCard {
   id: string;
   title: string;
@@ -72,4 +91,5 @@ export interface AppState {
   footageLinks: FootageItem[];
   inspirationProfiles: CreatorProfile[];
   users: string[];
+  hubUsers: HubUser[];
 }

@@ -1,12 +1,13 @@
 'use client';
+import { useState } from 'react';
 import { Pipeline, ContentCard } from '@/lib/types';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface Props {
   pipelines: Pipeline[];
   cards: ContentCard[];
+  hubUsers?: any[];
 }
-
-const STAGE_COLOR_MAP: Record<string, string> = {};
 
 function StatCard({ label, value, sub, color = '#6366f1' }: { label: string; value: string | number; sub?: string; color?: string }) {
   return (
@@ -18,36 +19,50 @@ function StatCard({ label, value, sub, color = '#6366f1' }: { label: string; val
   );
 }
 
-export default function Insights({ pipelines, cards }: Props) {
+function CollapsibleSection({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none',
+          cursor: 'pointer', padding: '32px 0 14px', width: '100%', textAlign: 'left',
+        }}
+      >
+        {open ? <ChevronDown size={14} color="#475569" /> : <ChevronRight size={14} color="#475569" />}
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{title}</span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
+export default function Insights({ pipelines, cards, hubUsers = [] }: Props) {
   const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const thisWeek = cards.filter(c => new Date(c.updatedAt) > weekAgo).length;
-  const today = cards.filter(c => new Date(c.updatedAt) > dayAgo).length;
+  // Per-pipeline total cards
+  const shortformPipelines = pipelines.filter(p =>
+    p.name.toLowerCase().includes('short') || p.name.toLowerCase().includes('reel') || p.name.toLowerCase().includes('tiktok')
+  );
+  const youtubePipelines = pipelines.filter(p =>
+    p.name.toLowerCase().includes('youtube') || p.name.toLowerCase().includes('yt')
+  );
+  const otherPipelines = pipelines.filter(p =>
+    !shortformPipelines.includes(p) && !youtubePipelines.includes(p)
+  );
 
-  // Cards scheduled this week
-  const scheduledThisWeek = cards.filter(c => {
-    if (!c.scheduledDate) return false;
-    const d = new Date(c.scheduledDate);
-    return d >= now && d <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  });
+  const shortformCards = cards.filter(c => shortformPipelines.some(p => p.id === c.pipelineId));
+  const youtubeCards = cards.filter(c => youtubePipelines.some(p => p.id === c.pipelineId));
 
-  // Posted cards (in any "Posted / Scheduled" stage)
+  // Posted cards
   const postedCards = cards.filter(c => {
     const pipeline = pipelines.find(p => p.id === c.pipelineId);
     const stage = pipeline?.stages.find(s => s.id === c.stageId);
     return stage?.name.toLowerCase().includes('posted') || stage?.name.toLowerCase().includes('scheduled');
   });
 
-  // Green light cards
-  const greenLightCards = cards.filter(c => {
-    const pipeline = pipelines.find(p => p.id === c.pipelineId);
-    const stage = pipeline?.stages.find(s => s.id === c.stageId);
-    return stage?.name.toLowerCase().includes('green');
-  });
-
-  // Cards in editing
+  // In editing
   const editingCards = cards.filter(c => {
     const pipeline = pipelines.find(p => p.id === c.pipelineId);
     const stage = pipeline?.stages.find(s => s.id === c.stageId);
@@ -59,13 +74,6 @@ export default function Insights({ pipelines, cards }: Props) {
     const pipeline = pipelines.find(p => p.id === c.pipelineId);
     const stage = pipeline?.stages.find(s => s.id === c.stageId);
     return stage?.name.toLowerCase().includes('ready to film');
-  });
-
-  // Revisions
-  const revisionsCards = cards.filter(c => {
-    const pipeline = pipelines.find(p => p.id === c.pipelineId);
-    const stage = pipeline?.stages.find(s => s.id === c.stageId);
-    return stage?.name.toLowerCase().includes('revision');
   });
 
   // Ideas
@@ -82,47 +90,32 @@ export default function Insights({ pipelines, cards }: Props) {
     return stage?.name.toLowerCase().includes('ready for editing');
   });
 
-  // Stuck cards (not updated in 5+ days, not posted)
-  const stuckCards = cards.filter(c => {
-    const pipeline = pipelines.find(p => p.id === c.pipelineId);
-    const stage = pipeline?.stages.find(s => s.id === c.stageId);
-    const isPosted = stage?.name.toLowerCase().includes('posted');
-    const isIdea = stage?.name.toLowerCase().includes('idea');
-    const daysSince = (now.getTime() - new Date(c.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-    return !isPosted && !isIdea && daysSince >= 5;
+  // Cards scheduled this week
+  const scheduledThisWeek = cards.filter(c => {
+    if (!c.scheduledDate) return false;
+    const d = new Date(c.scheduledDate);
+    return d >= now && d <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   });
 
   // Per-pipeline breakdown
   const pipelineBreakdowns = pipelines.map(pipeline => {
     const pCards = cards.filter(c => c.pipelineId === pipeline.id);
     const stageBreakdown = pipeline.stages.map(stage => ({
-      stage,
-      count: pCards.filter(c => c.stageId === stage.id).length,
+      stage, count: pCards.filter(c => c.stageId === stage.id).length,
     })).filter(s => s.count > 0);
     return { pipeline, total: pCards.length, stageBreakdown };
   });
 
   // Editor workload
   const editorMap: Record<string, number> = {};
-  cards.forEach(c => {
-    if (c.editor) {
-      editorMap[c.editor] = (editorMap[c.editor] || 0) + 1;
-    }
-  });
+  cards.forEach(c => { if (c.editor) editorMap[c.editor] = (editorMap[c.editor] || 0) + 1; });
 
-  // Type breakdown
+  // Content type split
   const typeMap: Record<string, number> = { 'Top of Funnel': 0, 'Middle of Funnel': 0, 'Bottom of Funnel': 0 };
   cards.forEach(c => { typeMap[c.type] = (typeMap[c.type] || 0) + 1; });
-
   const TYPE_COLORS: Record<string, string> = {
-    'Top of Funnel': '#6366f1',
-    'Middle of Funnel': '#f59e0b',
-    'Bottom of Funnel': '#22c55e',
+    'Top of Funnel': '#6366f1', 'Middle of Funnel': '#f59e0b', 'Bottom of Funnel': '#22c55e',
   };
-
-  const sectionTitle = (title: string) => (
-    <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '32px 0 14px' }}>{title}</div>
-  );
 
   const pill = (label: string, color: string) => (
     <span style={{ fontSize: 11, fontWeight: 700, background: color + '22', color, padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
@@ -140,118 +133,95 @@ export default function Insights({ pipelines, cards }: Props) {
 
   return (
     <div style={{ maxWidth: 960 }}>
-      {/* Top KPIs */}
-      {sectionTitle('Overview')}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        <StatCard label="Total Cards" value={cards.length} sub="across all pipelines" />
-        <StatCard label="Active This Week" value={thisWeek} sub="updated in last 7 days" color="#8b5cf6" />
-        <StatCard label="Ready to Film" value={readyToFilm.length} sub="waiting for camera" color="#f59e0b" />
-        <StatCard label="In Editing" value={editingCards.length} sub="editor has it" color="#3b82f6" />
-      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 12 }}>
-        <StatCard label="Revisions" value={revisionsCards.length} sub="needs fixes" color="#ef4444" />
-        <StatCard label="Green Light" value={greenLightCards.length} sub="ready to post" color="#22c55e" />
-        <StatCard label="Posted" value={postedCards.length} sub="live or scheduled" color="#64748b" />
-        <StatCard label="Stuck 5+ days" value={stuckCards.length} sub={stuckCards.length > 0 ? 'needs attention ⚠️' : 'all good ✓'} color={stuckCards.length > 0 ? '#ef4444' : '#22c55e'} />
-      </div>
+      {/* Main Insights — collapsible */}
+      <CollapsibleSection title="Overview" defaultOpen={true}>
+        {/* Total cards per pipeline type */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
+          {shortformPipelines.length > 0 && (
+            <StatCard label="Total Shortform Cards" value={shortformCards.length} sub={shortformPipelines.map(p => p.name).join(', ')} />
+          )}
+          {youtubePipelines.length > 0 && (
+            <StatCard label="Total YouTube Cards" value={youtubeCards.length} sub={youtubePipelines.map(p => p.name).join(', ')} color="#ef4444" />
+          )}
+          {otherPipelines.map(p => {
+            const count = cards.filter(c => c.pipelineId === p.id).length;
+            return <StatCard key={p.id} label={`Total ${p.name}`} value={count} color="#8b5cf6" />;
+          })}
+          <StatCard label="Ready to Film" value={readyToFilm.length} sub="waiting for camera" color="#f59e0b" />
+          <StatCard label="In Editing" value={editingCards.length} sub="editor has it" color="#3b82f6" />
+          <StatCard label="Ideas" value={ideaCards.length} sub="not yet approved" color="#8b5cf6" />
+          <StatCard label="Posted" value={postedCards.length} sub="live or scheduled" color="#64748b" />
+        </div>
 
-      {/* Stuck cards detail */}
-      {stuckCards.length > 0 && (
-        <>
-          {sectionTitle('Stuck Cards — Need Attention')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {stuckCards.map(card => {
-              const pipeline = pipelines.find(p => p.id === card.pipelineId);
-              const stage = pipeline?.stages.find(s => s.id === card.stageId);
-              const daysSince = Math.floor((now.getTime() - new Date(card.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
-              return (
-                <div key={card.id} style={{ background: '#13151e', border: '1px solid #2d1515', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: stage?.color || '#ef4444', flexShrink: 0 }} />
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{card.title}</div>
-                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{pipeline?.name} → {stage?.name}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {card.editor && <span style={{ fontSize: 11, color: '#64748b', background: '#1e2130', padding: '2px 8px', borderRadius: 4 }}>{card.editor}</span>}
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444' }}>{daysSince}d stuck</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {/* Scheduled this week */}
-      {scheduledThisWeek.length > 0 && (
-        <>
-          {sectionTitle('Scheduled This Week')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {scheduledThisWeek.sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()).map(card => {
-              const pipeline = pipelines.find(p => p.id === card.pipelineId);
-              const stage = pipeline?.stages.find(s => s.id === card.stageId);
-              const dateStr = new Date(card.scheduledDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-              return (
-                <div key={card.id} style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: stage?.color || '#6366f1', flexShrink: 0 }} />
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{card.title}</div>
-                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{pipeline?.name}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {pill(stage?.name || '', stage?.color || '#6366f1')}
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{dateStr}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {/* Pipeline breakdowns */}
-      {sectionTitle('Pipeline Breakdown')}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-        {pipelineBreakdowns.map(({ pipeline, total, stageBreakdown }) => (
-          <div key={pipeline.id} style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 12, padding: '18px 20px' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{pipeline.name}</div>
-            <div style={{ fontSize: 12, color: '#475569', marginBottom: 16 }}>{total} card{total !== 1 ? 's' : ''} total</div>
-            {stageBreakdown.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#334155' }}>No cards yet</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {pipeline.stages.map(stage => {
-                  const count = stageBreakdown.find(s => s.stage.id === stage.id)?.count || 0;
-                  const pct = total > 0 ? (count / total) * 100 : 0;
-                  return (
-                    <div key={stage.id}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: count > 0 ? '#94a3b8' : '#334155' }}>{stage.name}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: count > 0 ? '#e2e8f0' : '#334155' }}>{count}</span>
+        {/* Scheduled this week */}
+        {scheduledThisWeek.length > 0 && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '24px 0 12px' }}>Scheduled This Week</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {scheduledThisWeek.sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()).map(card => {
+                const pipeline = pipelines.find(p => p.id === card.pipelineId);
+                const stage = pipeline?.stages.find(s => s.id === card.stageId);
+                const dateStr = new Date(card.scheduledDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+                return (
+                  <div key={card.id} style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: stage?.color || '#6366f1', flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{card.title}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{pipeline?.name}</div>
                       </div>
-                      {count > 0 && (
-                        <div style={{ height: 3, background: '#1e2130', borderRadius: 2 }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: stage.color, borderRadius: 2, transition: 'width 0.3s' }} />
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {pill(stage?.name || '', stage?.color || '#6366f1')}
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{dateStr}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </CollapsibleSection>
+
+      {/* Analytics section — collapsible, closed by default */}
+      <CollapsibleSection title="Pipeline Breakdown" defaultOpen={false}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {pipelineBreakdowns.map(({ pipeline, total, stageBreakdown }) => (
+            <div key={pipeline.id} style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 12, padding: '18px 20px' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{pipeline.name}</div>
+              <div style={{ fontSize: 12, color: '#475569', marginBottom: 16 }}>{total} card{total !== 1 ? 's' : ''} total</div>
+              {stageBreakdown.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#334155' }}>No cards yet</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {pipeline.stages.map(stage => {
+                    const count = stageBreakdown.find(s => s.stage.id === stage.id)?.count || 0;
+                    const pct = total > 0 ? (count / total) * 100 : 0;
+                    return (
+                      <div key={stage.id}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, color: count > 0 ? '#94a3b8' : '#334155' }}>{stage.name}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: count > 0 ? '#e2e8f0' : '#334155' }}>{count}</span>
+                        </div>
+                        {count > 0 && (
+                          <div style={{ height: 3, background: '#1e2130', borderRadius: 2 }}>
+                            <div style={{ height: '100%', width: `${pct}%`, background: stage.color, borderRadius: 2, transition: 'width 0.3s' }} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
 
       {/* Editor workload */}
       {Object.keys(editorMap).length > 0 && (
-        <>
-          {sectionTitle('Editor Workload')}
+        <CollapsibleSection title="Editor Workload" defaultOpen={false}>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             {Object.entries(editorMap).sort((a, b) => b[1] - a[1]).map(([editor, count]) => (
               <div key={editor} style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 10, padding: '14px 20px', minWidth: 160 }}>
@@ -261,35 +231,85 @@ export default function Insights({ pipelines, cards }: Props) {
               </div>
             ))}
           </div>
-        </>
+        </CollapsibleSection>
       )}
 
       {/* Content type split */}
-      {sectionTitle('Content Type Split')}
-      <div style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 12, padding: '18px 20px' }}>
-        <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
-          {Object.entries(typeMap).map(([type, count]) => (
-            <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: TYPE_COLORS[type] }} />
-              <span style={{ fontSize: 12, color: '#94a3b8' }}>{type}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{count}</span>
-            </div>
-          ))}
+      <CollapsibleSection title="Content Type Split" defaultOpen={false}>
+        <div style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 12, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
+            {Object.entries(typeMap).map(([type, count]) => (
+              <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: TYPE_COLORS[type] }} />
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>{type}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{count}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ height: 8, background: '#1e2130', borderRadius: 4, overflow: 'hidden', display: 'flex' }}>
+            {Object.entries(typeMap).map(([type, count]) => {
+              const pct = cards.length > 0 ? (count / cards.length) * 100 : 0;
+              return pct > 0 ? (
+                <div key={type} style={{ height: '100%', width: `${pct}%`, background: TYPE_COLORS[type] }} />
+              ) : null;
+            })}
+          </div>
         </div>
-        <div style={{ height: 8, background: '#1e2130', borderRadius: 4, overflow: 'hidden', display: 'flex' }}>
-          {Object.entries(typeMap).map(([type, count]) => {
-            const pct = cards.length > 0 ? (count / cards.length) * 100 : 0;
-            return pct > 0 ? (
-              <div key={type} style={{ height: '100%', width: `${pct}%`, background: TYPE_COLORS[type] }} />
-            ) : null;
-          })}
-        </div>
-      </div>
+      </CollapsibleSection>
+
+      {/* Per-member insights (for hub users with pipelines assigned) */}
+      {hubUsers.length > 0 && (
+        <CollapsibleSection title="Team Member Insights" defaultOpen={false}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {hubUsers.map(member => {
+              const memberPipelines = pipelines.filter(p => member.permissions?.pipelineIds?.includes(p.id));
+              const memberCards = cards.filter(c => memberPipelines.some(p => p.id === c.pipelineId));
+              const memberPosted = memberCards.filter(c => {
+                const pl = memberPipelines.find(p => p.id === c.pipelineId);
+                const st = pl?.stages.find(s => s.id === c.stageId);
+                return st?.name.toLowerCase().includes('posted');
+              });
+              const memberEditing = memberCards.filter(c => {
+                const pl = memberPipelines.find(p => p.id === c.pipelineId);
+                const st = pl?.stages.find(s => s.id === c.stageId);
+                return st?.name.toLowerCase().includes('editing') && !st?.name.toLowerCase().includes('ready');
+              });
+              if (memberPipelines.length === 0) return null;
+              return (
+                <div key={member.id} style={{ background: '#13151e', border: '1px solid #1e2130', borderRadius: 12, padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#6366f122', border: '1px solid #6366f133', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#818cf8' }}>{member.name[0]?.toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{member.name}</div>
+                      <div style={{ fontSize: 11, color: '#475569' }}>{memberPipelines.map(p => p.name).join(', ')}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 16 }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: '#6366f1' }}>{memberCards.length}</div>
+                      <div style={{ fontSize: 11, color: '#475569' }}>Total Cards</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: '#3b82f6' }}>{memberEditing.length}</div>
+                      <div style={{ fontSize: 11, color: '#475569' }}>In Editing</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: '#22c55e' }}>{memberPosted.length}</div>
+                      <div style={{ fontSize: 11, color: '#475569' }}>Posted</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CollapsibleSection>
+      )}
 
       {/* Ready for editing list */}
       {readyForEditing.length > 0 && (
-        <>
-          {sectionTitle(`Ready for Editing — ${readyForEditing.length} card${readyForEditing.length !== 1 ? 's' : ''}`)}
+        <CollapsibleSection title={`Ready for Editing — ${readyForEditing.length}`} defaultOpen={false}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {readyForEditing.map(card => {
               const pipeline = pipelines.find(p => p.id === card.pipelineId);
@@ -314,7 +334,7 @@ export default function Insights({ pipelines, cards }: Props) {
               );
             })}
           </div>
-        </>
+        </CollapsibleSection>
       )}
 
       <div style={{ height: 40 }} />
