@@ -193,7 +193,7 @@ export async function savePipelines(pipelines: Pipeline[], hub = 'danas') {
       id: dbPipelineId(p.id, hub),
       name: p.name,
       stages: p.stages,
-      pipeline_type: p.pipelineType || 'shortform',
+      pipeline_type: p.pipelineType ?? null,
       columns: p.columns || null,
     });
   }
