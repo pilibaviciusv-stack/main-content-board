@@ -276,46 +276,51 @@ export default function HubPage() {
           const isPipelineActive = view.type === 'pipeline' && (view as any).id === p.id;
           const hasYT = isYoutube(p);
           const hasSF = isShortform(p);
-          const hasIG = isInstagram(p);
           const hasCT = isCustomTable(p);
-          const hasSubViews = hasYT || hasSF;
+
+          // Active state: pipeline board OR roadmap for YT OR grid for SF OR table for CT
+          const isActive =
+            isPipelineActive ||
+            (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id) ||
+            (hasSF && view.type === 'grid' && (view as any).pipelineId === p.id) ||
+            (hasCT && view.type === 'table' && (view as any).pipelineId === p.id);
+
           return (
             <div key={p.id}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <button
-                  onClick={() => {
-                    if (hasCT) {
-                      navigate({ type: 'table', pipelineId: p.id });
-                    } else if (hasYT) {
-                      navigate({ type: 'roadmap', pipelineId: p.id });
-                      togglePipelineExpand(p.id);
-                    } else {
-                      navigate({ type: 'pipeline', id: p.id });
-                      if (hasSubViews) togglePipelineExpand(p.id);
-                    }
-                  }}
-                  style={{
-                    flex: 1, display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
-                    borderRadius: 8, background: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id) || (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id)) ? '#1e2130' : 'none', border: 'none',
-                    color: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id) || (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id)) ? '#e2e8f0' : '#64748b', cursor: 'pointer', fontSize: 13,
-                    fontWeight: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id) || (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id)) ? 600 : 400, textAlign: 'left', transition: 'all 0.15s',
-                  }}
-                >
-                  {getPipelineIcon(p)}
-                  <span style={{ flex: 1 }}>{p.name}</span>
-                  {hasSubViews && (
-                    isExpanded
-                      ? <ChevronDown size={12} style={{ opacity: 0.4 }} />
-                      : <ChevronRight size={12} style={{ opacity: 0.4 }} />
-                  )}
-                </button>
-              </div>
-              {/* Sub-views only visible when pipeline expanded */}
-              {isExpanded && (
-                <>
-                  {hasYT && navBtn('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => navigate({ type: 'roadmap', pipelineId: p.id }), true)}
-                  {hasSF && navBtn('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)}
-                </>
+              <button
+                onClick={() => {
+                  if (hasCT) {
+                    navigate({ type: 'table', pipelineId: p.id });
+                  } else if (hasYT) {
+                    // YouTube → always roadmap, no sub-items needed
+                    navigate({ type: 'roadmap', pipelineId: p.id });
+                  } else if (hasSF) {
+                    // Shortform → kanban board, expand to show Grid sub-item
+                    navigate({ type: 'pipeline', id: p.id });
+                    togglePipelineExpand(p.id);
+                  } else {
+                    // IG Stories / others → just kanban board, no sub-items
+                    navigate({ type: 'pipeline', id: p.id });
+                  }
+                }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
+                  borderRadius: 8, background: isActive ? '#1e2130' : 'none', border: 'none',
+                  color: isActive ? '#e2e8f0' : '#64748b', cursor: 'pointer', fontSize: 13,
+                  fontWeight: isActive ? 600 : 400, textAlign: 'left', transition: 'all 0.15s',
+                }}
+              >
+                {getPipelineIcon(p)}
+                <span style={{ flex: 1 }}>{p.name}</span>
+                {hasSF && (
+                  isExpanded
+                    ? <ChevronDown size={12} style={{ opacity: 0.4 }} />
+                    : <ChevronRight size={12} style={{ opacity: 0.4 }} />
+                )}
+              </button>
+              {/* Shortform only: Grid sub-view */}
+              {hasSF && isExpanded && (
+                navBtn('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)
               )}
             </div>
           );
