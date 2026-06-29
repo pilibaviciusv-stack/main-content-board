@@ -286,6 +286,9 @@ export default function HubPage() {
                   onClick={() => {
                     if (hasCT) {
                       navigate({ type: 'table', pipelineId: p.id });
+                    } else if (hasYT) {
+                      navigate({ type: 'roadmap', pipelineId: p.id });
+                      togglePipelineExpand(p.id);
                     } else {
                       navigate({ type: 'pipeline', id: p.id });
                       if (hasSubViews) togglePipelineExpand(p.id);
@@ -293,9 +296,9 @@ export default function HubPage() {
                   }}
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
-                    borderRadius: 8, background: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id)) ? '#1e2130' : 'none', border: 'none',
-                    color: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id)) ? '#e2e8f0' : '#64748b', cursor: 'pointer', fontSize: 13,
-                    fontWeight: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id)) ? 600 : 400, textAlign: 'left', transition: 'all 0.15s',
+                    borderRadius: 8, background: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id) || (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id)) ? '#1e2130' : 'none', border: 'none',
+                    color: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id) || (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id)) ? '#e2e8f0' : '#64748b', cursor: 'pointer', fontSize: 13,
+                    fontWeight: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id) || (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id)) ? 600 : 400, textAlign: 'left', transition: 'all 0.15s',
                   }}
                 >
                   {getPipelineIcon(p)}
