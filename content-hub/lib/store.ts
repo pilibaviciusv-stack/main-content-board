@@ -93,7 +93,7 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
         id: appPipelineId(r.id, hub),
         name: r.name,
         stages: r.stages,
-        pipelineType: r.pipeline_type || undefined,
+        pipelineType: r.pipeline_type ?? undefined,
         columns: r.columns || undefined,
       }));
     } else {
@@ -189,13 +189,17 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
 
 export async function savePipelines(pipelines: Pipeline[], hub = 'danas') {
   for (const p of pipelines) {
-    await supabase.from('pipelines').upsert({
+    const row: any = {
       id: dbPipelineId(p.id, hub),
       name: p.name,
       stages: p.stages,
-      pipeline_type: p.pipelineType ?? null,
       columns: p.columns || null,
-    });
+    };
+    // Only set pipeline_type if explicitly defined — never overwrite with null
+    if (p.pipelineType !== undefined) {
+      row.pipeline_type = p.pipelineType;
+    }
+    await supabase.from('pipelines').upsert(row);
   }
   // Delete removed pipelines scoped to this hub
   if (hub === 'danas') {
