@@ -278,7 +278,7 @@ export default function HubPage() {
           const hasSF = isShortform(p);
           const hasCT = isCustomTable(p);
 
-          // Active state: pipeline board OR roadmap for YT OR grid for SF OR table for CT
+          // Active state
           const isActive =
             isPipelineActive ||
             (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id) ||
@@ -291,16 +291,10 @@ export default function HubPage() {
                 onClick={() => {
                   if (hasCT) {
                     navigate({ type: 'table', pipelineId: p.id });
-                  } else if (hasYT) {
-                    // YouTube → always roadmap, no sub-items needed
-                    navigate({ type: 'roadmap', pipelineId: p.id });
-                  } else if (hasSF) {
-                    // Shortform → kanban board, expand to show Grid sub-item
-                    navigate({ type: 'pipeline', id: p.id });
-                    togglePipelineExpand(p.id);
                   } else {
-                    // IG Stories / others → just kanban board, no sub-items
+                    // All kanban pipelines open the board; YT/SF also expand to show sub-items
                     navigate({ type: 'pipeline', id: p.id });
+                    if (hasYT || hasSF) togglePipelineExpand(p.id);
                   }
                 }}
                 style={{
@@ -312,16 +306,15 @@ export default function HubPage() {
               >
                 {getPipelineIcon(p)}
                 <span style={{ flex: 1 }}>{p.name}</span>
-                {hasSF && (
+                {(hasYT || hasSF) && (
                   isExpanded
                     ? <ChevronDown size={12} style={{ opacity: 0.4 }} />
                     : <ChevronRight size={12} style={{ opacity: 0.4 }} />
                 )}
               </button>
-              {/* Shortform only: Grid sub-view */}
-              {hasSF && isExpanded && (
-                navBtn('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)
-              )}
+              {/* YouTube: Roadmap sub-item. Shortform: Grid sub-item. IG: nothing. */}
+              {hasYT && isExpanded && navBtn('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => navigate({ type: 'roadmap', pipelineId: p.id }), true)}
+              {hasSF && isExpanded && navBtn('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)}
             </div>
           );
         })}
