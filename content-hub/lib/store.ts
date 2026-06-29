@@ -141,12 +141,12 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
     // Load workspace
     let workspaceRows: any[] | null = null;
     if (hub === 'danas') {
-      // Danas uses unprefixed keys — fetch all workspace rows without __ prefix
+      // Danas uses unprefixed keys (legacy). Fetch all and filter client-side.
       const { data } = await supabase
         .from('workspace')
-        .select('*')
-        .not('key', 'like', '__%');
-      workspaceRows = data;
+        .select('*');
+      // Only keep rows without __ prefix (danas keys)
+      workspaceRows = (data || []).filter((r: any) => !r.key.includes('__'));
     } else {
       const prefix = `${hub}__`;
       const { data } = await supabase
