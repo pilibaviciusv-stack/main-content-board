@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight, Users, Shield, Eye, EyeOff, Layers, Grid3x3, Youtube, Instagram, Table2 } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Users, Shield, Eye, EyeOff, Layers, Grid3x3, PlayCircle, Camera, Table2 } from 'lucide-react';
 import { HubUser, Pipeline, PipelineType } from '@/lib/types';
 
 interface Props {
@@ -60,8 +60,8 @@ function makeInstagramStages() {
 
 const PIPELINE_TYPE_OPTIONS: { type: PipelineType; label: string; desc: string; icon: React.ReactNode; color: string }[] = [
   { type: 'shortform', label: 'Shortform', desc: 'Kanban board for Reels, TikToks, Clips', icon: <Grid3x3 size={16} />, color: '#6366f1' },
-  { type: 'youtube', label: 'YouTube', desc: 'Kanban + Roadmap timeline view', icon: <Youtube size={16} />, color: '#ef4444' },
-  { type: 'instagram', label: 'Instagram Grid', desc: 'Visual grid of posts with thumbnails', icon: <Instagram size={16} />, color: '#ec4899' },
+  { type: 'youtube', label: 'YouTube', desc: 'Kanban + Roadmap timeline view', icon: <PlayCircle size={16} />, color: '#ef4444' },
+  { type: 'instagram', label: 'Instagram Grid', desc: 'Visual grid of posts with thumbnails', icon: <Camera size={16} />, color: '#ec4899' },
   { type: 'custom-table', label: 'Custom Table', desc: 'Notion-style table with custom columns', icon: <Table2 size={16} />, color: '#22c55e' },
 ];
 
