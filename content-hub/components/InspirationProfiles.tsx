@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { Plus, Trash2, ExternalLink, PlaySquare, Camera } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Plus, Trash2, ExternalLink, PlaySquare, Camera, Loader2 } from 'lucide-react';
 
 export interface CreatorProfile {
   id: string;
@@ -22,11 +22,6 @@ interface Props {
 
 function generateId() {
   return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-}
-
-function getYoutubeThumb(url: string): string {
-  // Extract channel ID or handle and return a placeholder
-  return '';
 }
 
 function Avatar({ url, name, size = 48 }: { url: string; name: string; size?: number }) {
@@ -52,9 +47,32 @@ function ProfileCard({ profile, onDelete, onUpdate }: {
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
+  const [fetchingYt, setFetchingYt] = useState(false);
+  const [fetchingIg, setFetchingIg] = useState(false);
 
   const save = () => { onUpdate(draft); setEditing(false); };
   const cancel = () => { setDraft(profile); setEditing(false); };
+
+  const autoFetchPfp = useCallback(async (url: string, platform: 'youtube' | 'instagram') => {
+    if (!url.trim()) return;
+    if (platform === 'youtube') setFetchingYt(true);
+    else setFetchingIg(true);
+
+    try {
+      const res = await fetch(`/api/fetch-pfp?url=${encodeURIComponent(url)}&platform=${platform}`);
+      const data = await res.json();
+      if (data.pfp) {
+        setDraft(p => platform === 'youtube'
+          ? { ...p, youtubePfp: data.pfp }
+          : { ...p, instagramPfp: data.pfp }
+        );
+      }
+    } catch { /* silent fail */ }
+    finally {
+      if (platform === 'youtube') setFetchingYt(false);
+      else setFetchingIg(false);
+    }
+  }, []);
 
   const inputStyle: React.CSSProperties = {
     background: '#1a1d26', border: '1px solid #2d3148', borderRadius: 7,
@@ -71,27 +89,53 @@ function ProfileCard({ profile, onDelete, onUpdate }: {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {/* YouTube URL */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 5 }}>
               <PlaySquare size={12} /> YouTube URL
+              {fetchingYt && <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />}
             </label>
-            <input value={draft.youtubeUrl} onChange={e => setDraft(p => ({ ...p, youtubeUrl: e.target.value }))} style={inputStyle} placeholder="https://youtube.com/@..." />
+            <input
+              value={draft.youtubeUrl}
+              onChange={e => setDraft(p => ({ ...p, youtubeUrl: e.target.value }))}
+              onBlur={e => autoFetchPfp(e.target.value, 'youtube')}
+              style={inputStyle}
+              placeholder="https://youtube.com/@..."
+            />
           </div>
+          {/* Instagram URL */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: '#e1306c', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 5 }}>
               <Camera size={12} /> Instagram URL
+              {fetchingIg && <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />}
             </label>
-            <input value={draft.instagramUrl} onChange={e => setDraft(p => ({ ...p, instagramUrl: e.target.value }))} style={inputStyle} placeholder="https://instagram.com/..." />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>YouTube PFP URL</label>
-            <input value={draft.youtubePfp} onChange={e => setDraft(p => ({ ...p, youtubePfp: e.target.value }))} style={inputStyle} placeholder="Paste profile image URL..." />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Instagram PFP URL</label>
-            <input value={draft.instagramPfp} onChange={e => setDraft(p => ({ ...p, instagramPfp: e.target.value }))} style={inputStyle} placeholder="Paste profile image URL..." />
+            <input
+              value={draft.instagramUrl}
+              onChange={e => setDraft(p => ({ ...p, instagramUrl: e.target.value }))}
+              onBlur={e => autoFetchPfp(e.target.value, 'instagram')}
+              style={inputStyle}
+              placeholder="https://instagram.com/..."
+            />
           </div>
         </div>
+
+        {/* PFP preview row */}
+        {(draft.youtubePfp || draft.instagramPfp) && (
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+            {draft.youtubePfp && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Avatar url={draft.youtubePfp} name={draft.name} size={36} />
+                <span style={{ fontSize: 11, color: '#475569' }}>YT pfp fetched ✓</span>
+              </div>
+            )}
+            {draft.instagramPfp && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Avatar url={draft.instagramPfp} name={draft.name} size={36} />
+                <span style={{ fontSize: 11, color: '#475569' }}>IG pfp fetched ✓</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Tags</label>
@@ -108,6 +152,8 @@ function ProfileCard({ profile, onDelete, onUpdate }: {
           <button onClick={cancel} style={{ background: '#1a1d26', border: '1px solid #2d3148', color: '#94a3b8', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
           <button onClick={save} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Save</button>
         </div>
+
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -117,7 +163,7 @@ function ProfileCard({ profile, onDelete, onUpdate }: {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Avatar url={draft.youtubePfp || draft.instagramPfp} name={profile.name} size={44} />
+          <Avatar url={profile.youtubePfp || profile.instagramPfp} name={profile.name} size={44} />
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0' }}>{profile.name || 'Unnamed Creator'}</div>
             {profile.tags && <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{profile.tags}</div>}
@@ -200,7 +246,7 @@ export default function InspirationProfiles({ profiles, onChange }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>Inspiration Profiles</h2>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>Track creators you study. Links, PFPs, and notes on what to steal.</p>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>Paste a YouTube or Instagram URL — pfp loads automatically.</p>
         </div>
         <button onClick={addProfile}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
