@@ -93,7 +93,7 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
         id: appPipelineId(r.id, hub),
         name: r.name,
         stages: r.stages,
-        pipelineType: r.pipeline_type || 'shortform',
+        pipelineType: r.pipeline_type || undefined,
         columns: r.columns || undefined,
       }));
     } else {
@@ -141,10 +141,11 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
     // Load workspace
     let workspaceRows: any[] | null = null;
     if (hub === 'danas') {
+      // Danas uses unprefixed keys — fetch all workspace rows without __ prefix
       const { data } = await supabase
         .from('workspace')
         .select('*')
-        .in('key', ['music_bank', 'footage_links', 'inspiration_profiles', 'excluded_videos']);
+        .not('key', 'like', '__%');
       workspaceRows = data;
     } else {
       const prefix = `${hub}__`;
