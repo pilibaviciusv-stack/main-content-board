@@ -1,5 +1,23 @@
 export type CardType = 'Top of Funnel' | 'Middle of Funnel' | 'Bottom of Funnel';
 
+export type PipelineType = 'shortform' | 'youtube' | 'instagram' | 'custom-table';
+
+export interface CustomTableColumn {
+  id: string;
+  name: string;
+  type: 'text' | 'select' | 'date' | 'checkbox';
+  options?: string[]; // for 'select' type
+  width?: number;
+}
+
+export interface CustomTableRow {
+  id: string;
+  tableId: string; // pipeline id this belongs to
+  values: Record<string, string | boolean>; // columnId -> value
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface HubUserPermissions {
   pipelineIds: string[];   // which pipelines they can see
   canViewInsights: boolean;
@@ -53,6 +71,8 @@ export interface Pipeline {
   id: string;
   name: string;
   stages: Stage[];
+  pipelineType?: PipelineType; // defaults to 'shortform' if not set
+  columns?: CustomTableColumn[]; // only used when pipelineType === 'custom-table'
 }
 
 export interface MusicTrack {
@@ -92,4 +112,5 @@ export interface AppState {
   inspirationProfiles: CreatorProfile[];
   users: string[];
   hubUsers: HubUser[];
+  customTableRows: CustomTableRow[];
 }

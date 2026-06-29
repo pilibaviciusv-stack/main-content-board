@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight, Users, Shield, Eye, EyeOff, Layers } from 'lucide-react';
-import { HubUser, Pipeline } from '@/lib/types';
+import { Plus, Trash2, ChevronDown, ChevronRight, Users, Shield, Eye, EyeOff, Layers, Grid3x3, Youtube, Instagram, Table2 } from 'lucide-react';
+import { HubUser, Pipeline, PipelineType } from '@/lib/types';
 
 interface Props {
   hubUsers: HubUser[];
@@ -37,17 +37,48 @@ function makeShortformStages() {
   ];
 }
 
+function makeYoutubeStages() {
+  return [
+    { id: generateId(), name: 'Ideas', color: '#6366f1' },
+    { id: generateId(), name: 'Approved', color: '#8b5cf6' },
+    { id: generateId(), name: 'Scripting', color: '#a855f7' },
+    { id: generateId(), name: 'Ready to Film', color: '#f59e0b' },
+    { id: generateId(), name: 'Editing', color: '#3b82f6' },
+    { id: generateId(), name: 'Green Light', color: '#22c55e' },
+    { id: generateId(), name: 'Posted / Scheduled', color: '#64748b' },
+  ];
+}
+
+function makeInstagramStages() {
+  return [
+    { id: generateId(), name: 'Idea', color: '#ec4899' },
+    { id: generateId(), name: 'Approved', color: '#8b5cf6' },
+    { id: generateId(), name: 'Ready to Post', color: '#f59e0b' },
+    { id: generateId(), name: 'Posted', color: '#22c55e' },
+  ];
+}
+
+const PIPELINE_TYPE_OPTIONS: { type: PipelineType; label: string; desc: string; icon: React.ReactNode; color: string }[] = [
+  { type: 'shortform', label: 'Shortform', desc: 'Kanban board for Reels, TikToks, Clips', icon: <Grid3x3 size={16} />, color: '#6366f1' },
+  { type: 'youtube', label: 'YouTube', desc: 'Kanban + Roadmap timeline view', icon: <Youtube size={16} />, color: '#ef4444' },
+  { type: 'instagram', label: 'Instagram Grid', desc: 'Visual grid of posts with thumbnails', icon: <Instagram size={16} />, color: '#ec4899' },
+  { type: 'custom-table', label: 'Custom Table', desc: 'Notion-style table with custom columns', icon: <Table2 size={16} />, color: '#22c55e' },
+];
+
 export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipelinesChange }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [showPwd, setShowPwd] = useState<Record<string, boolean>>({});
   const [newPipelineName, setNewPipelineName] = useState('');
+  const [newPipelineType, setNewPipelineType] = useState<PipelineType>('shortform');
   const [addingPipelineForUser, setAddingPipelineForUser] = useState<string | null>(null);
   const [newUserPipelineName, setNewUserPipelineName] = useState('');
+  const [newUserPipelineType, setNewUserPipelineType] = useState<PipelineType>('shortform');
   const [newUser, setNewUser] = useState({
     name: '', email: '', password: '',
     pipelineIds: [] as string[],
     newPipelineNames: [] as string[], // custom pipeline names to create
+    newPipelineTypes: [] as PipelineType[], // type for each new pipeline
     canViewInsights: false, canViewMusic: false,
     canViewFootage: false, canViewInspiration: false,
     isAdmin: false,
@@ -60,13 +91,22 @@ export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipel
     let updatedPipelines = [...pipelines];
     const newPipelineIds: string[] = [...newUser.pipelineIds];
 
-    for (const pName of newUser.newPipelineNames) {
+    for (let i = 0; i < newUser.newPipelineNames.length; i++) {
+      const pName = newUser.newPipelineNames[i];
+      const pType: PipelineType = newUser.newPipelineTypes[i] || 'shortform';
       if (!pName.trim()) continue;
       const newPipelineId = generateId();
+      let stages;
+      if (pType === 'youtube') stages = makeYoutubeStages();
+      else if (pType === 'instagram') stages = makeInstagramStages();
+      else if (pType === 'custom-table') stages = [];
+      else stages = makeShortformStages();
       const newPipeline: Pipeline = {
         id: newPipelineId,
         name: pName.trim(),
-        stages: makeShortformStages(),
+        stages,
+        pipelineType: pType,
+        columns: pType === 'custom-table' ? [] : undefined,
       };
       updatedPipelines = [...updatedPipelines, newPipeline];
       newPipelineIds.push(newPipelineId);
@@ -93,7 +133,7 @@ export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipel
       createdAt: new Date().toISOString(),
     };
     onChange([...hubUsers, user]);
-    setNewUser({ name: '', email: '', password: '', pipelineIds: [], newPipelineNames: [], canViewInsights: false, canViewMusic: false, canViewFootage: false, canViewInspiration: false, isAdmin: false });
+    setNewUser({ name: '', email: '', password: '', pipelineIds: [], newPipelineNames: [], newPipelineTypes: [], canViewInsights: false, canViewMusic: false, canViewFootage: false, canViewInspiration: false, isAdmin: false });
     setAdding(false);
   };
 
@@ -128,12 +168,21 @@ export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipel
   const addNewPipelineToUser = () => {
     const name = newPipelineName.trim();
     if (!name) return;
-    setNewUser(prev => ({ ...prev, newPipelineNames: [...prev.newPipelineNames, name] }));
+    setNewUser(prev => ({
+      ...prev,
+      newPipelineNames: [...prev.newPipelineNames, name],
+      newPipelineTypes: [...prev.newPipelineTypes, newPipelineType],
+    }));
     setNewPipelineName('');
+    setNewPipelineType('shortform');
   };
 
   const removeNewPipelineName = (idx: number) => {
-    setNewUser(prev => ({ ...prev, newPipelineNames: prev.newPipelineNames.filter((_, i) => i !== idx) }));
+    setNewUser(prev => ({
+      ...prev,
+      newPipelineNames: prev.newPipelineNames.filter((_, i) => i !== idx),
+      newPipelineTypes: prev.newPipelineTypes.filter((_, i) => i !== idx),
+    }));
   };
 
   const permLabel = (label: string, checked: boolean, onChange: () => void) => (
@@ -144,13 +193,20 @@ export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipel
   );
 
   // Add pipeline directly to existing user
-  const addPipelineForExistingUser = (userId: string, pipelineName: string) => {
+  const addPipelineForExistingUser = (userId: string, pipelineName: string, pType: PipelineType = 'shortform') => {
     if (!pipelineName.trim() || !onPipelinesChange) return;
     const newPipelineId = generateId();
+    let stages;
+    if (pType === 'youtube') stages = makeYoutubeStages();
+    else if (pType === 'instagram') stages = makeInstagramStages();
+    else if (pType === 'custom-table') stages = [];
+    else stages = makeShortformStages();
     const newPipeline: Pipeline = {
       id: newPipelineId,
       name: pipelineName.trim(),
-      stages: makeShortformStages(),
+      stages,
+      pipelineType: pType,
+      columns: pType === 'custom-table' ? [] : undefined,
     };
     onPipelinesChange([...pipelines, newPipeline]);
     const user = hubUsers.find(u => u.id === userId);
@@ -207,14 +263,34 @@ export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipel
           </div>
 
           {/* Create new custom pipelines */}
-          <div style={{ fontSize: 11, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Create Custom Pipeline for This Member</div>
+          <div style={{ fontSize: 11, color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Create New Pipeline for This Member</div>
+
+          {/* Pipeline type selector */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+            {PIPELINE_TYPE_OPTIONS.map(opt => (
+              <label key={opt.type} style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+                background: newPipelineType === opt.type ? `${opt.color}18` : '#1a1d26',
+                border: `1px solid ${newPipelineType === opt.type ? opt.color : '#2d3148'}`,
+                transition: 'all 0.15s',
+              }}>
+                <input type="radio" name="new-pipeline-type" checked={newPipelineType === opt.type} onChange={() => setNewPipelineType(opt.type)} style={{ display: 'none' }} />
+                <span style={{ color: newPipelineType === opt.type ? opt.color : '#475569' }}>{opt.icon}</span>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: newPipelineType === opt.type ? '#e2e8f0' : '#64748b' }}>{opt.label}</div>
+                  <div style={{ fontSize: 10, color: '#475569' }}>{opt.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input
               value={newPipelineName}
               onChange={e => setNewPipelineName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addNewPipelineToUser()}
               style={{ ...inputStyle, flex: 1 }}
-              placeholder="e.g. Shortform Clipper1"
+              placeholder={`e.g. ${newPipelineType === 'custom-table' ? 'Raw Ideas' : newPipelineType === 'youtube' ? 'YouTube Main' : newPipelineType === 'instagram' ? 'IG Feed' : 'Shortform Clipper1'}`}
             />
             <button onClick={addNewPipelineToUser}
               style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -223,18 +299,17 @@ export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipel
           </div>
           {newUser.newPipelineNames.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-              {newUser.newPipelineNames.map((name, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#22c55e18', border: '1px solid #22c55e44', borderRadius: 8, padding: '4px 10px' }}>
-                  <Layers size={11} color="#4ade80" />
-                  <span style={{ fontSize: 12, color: '#4ade80' }}>{name}</span>
-                  <button onClick={() => removeNewPipelineName(idx)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
-                </div>
-              ))}
-            </div>
-          )}
-          {newUser.newPipelineNames.length > 0 && (
-            <div style={{ fontSize: 11, color: '#475569', marginBottom: 14 }}>
-              These pipelines will be auto-created with a shortform clipper stage layout and assigned to this member.
+              {newUser.newPipelineNames.map((name, idx) => {
+                const pType = newUser.newPipelineTypes[idx] || 'shortform';
+                const typeOpt = PIPELINE_TYPE_OPTIONS.find(o => o.type === pType);
+                return (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, background: `${typeOpt?.color || '#22c55e'}18`, border: `1px solid ${typeOpt?.color || '#22c55e'}44`, borderRadius: 8, padding: '4px 10px' }}>
+                    <span style={{ color: typeOpt?.color || '#4ade80' }}>{typeOpt?.icon}</span>
+                    <span style={{ fontSize: 12, color: typeOpt?.color || '#4ade80' }}>{name}</span>
+                    <button onClick={() => removeNewPipelineName(idx)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -343,19 +418,35 @@ export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipel
                           <Plus size={12} /> Create new pipeline for this member
                         </button>
                       ) : (
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <input
-                            value={newUserPipelineName}
-                            onChange={e => setNewUserPipelineName(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') { addPipelineForExistingUser(user.id, newUserPipelineName); setNewUserPipelineName(''); setAddingPipelineForUser(null); } }}
-                            style={{ ...inputStyle, flex: 1 }}
-                            placeholder="e.g. Shortform Clipper2"
-                            autoFocus
-                          />
-                          <button onClick={() => { addPipelineForExistingUser(user.id, newUserPipelineName); setNewUserPipelineName(''); setAddingPipelineForUser(null); }}
-                            style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Add</button>
-                          <button onClick={() => { setAddingPipelineForUser(null); setNewUserPipelineName(''); }}
-                            style={{ background: '#1a1d26', border: '1px solid #2d3148', color: '#94a3b8', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+                        <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 8 }}>
+                            {PIPELINE_TYPE_OPTIONS.map(opt => (
+                              <label key={opt.type} style={{
+                                display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 7, cursor: 'pointer',
+                                background: newUserPipelineType === opt.type ? `${opt.color}18` : '#0d0f14',
+                                border: `1px solid ${newUserPipelineType === opt.type ? opt.color : '#1e2130'}`,
+                                transition: 'all 0.15s',
+                              }}>
+                                <input type="radio" name={`pipeline-type-${user.id}`} checked={newUserPipelineType === opt.type} onChange={() => setNewUserPipelineType(opt.type)} style={{ display: 'none' }} />
+                                <span style={{ color: newUserPipelineType === opt.type ? opt.color : '#475569' }}>{opt.icon}</span>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: newUserPipelineType === opt.type ? '#e2e8f0' : '#64748b' }}>{opt.label}</div>
+                              </label>
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <input
+                              value={newUserPipelineName}
+                              onChange={e => setNewUserPipelineName(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') { addPipelineForExistingUser(user.id, newUserPipelineName, newUserPipelineType); setNewUserPipelineName(''); setNewUserPipelineType('shortform'); setAddingPipelineForUser(null); } }}
+                              style={{ ...inputStyle, flex: 1 }}
+                              placeholder={newUserPipelineType === 'custom-table' ? 'e.g. Raw Ideas' : 'e.g. Clipper2'}
+                              autoFocus
+                            />
+                            <button onClick={() => { addPipelineForExistingUser(user.id, newUserPipelineName, newUserPipelineType); setNewUserPipelineName(''); setNewUserPipelineType('shortform'); setAddingPipelineForUser(null); }}
+                              style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Add</button>
+                            <button onClick={() => { setAddingPipelineForUser(null); setNewUserPipelineName(''); setNewUserPipelineType('shortform'); }}
+                              style={{ background: '#1a1d26', border: '1px solid #2d3148', color: '#94a3b8', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+                          </div>
                         </div>
                       )}
                     </div>

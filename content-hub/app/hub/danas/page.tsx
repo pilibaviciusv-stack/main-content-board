@@ -1,9 +1,9 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp, Home, ArrowLeft, ChevronDown, ChevronRight, Shield } from 'lucide-react';
-import { AppState, ContentCard, Pipeline } from '@/lib/types';
-import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey, saveHubUsers } from '@/lib/store';
+import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp, Home, ArrowLeft, ChevronDown, ChevronRight, Shield, Table2 } from 'lucide-react';
+import { AppState, ContentCard, Pipeline, CustomTableRow } from '@/lib/types';
+import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey, saveHubUsers, saveCustomTableRows } from '@/lib/store';
 import Board from '@/components/Board';
 import MusicBank from '@/components/MusicBank';
 import FootageLinks from '@/components/FootageLinks';
@@ -14,6 +14,7 @@ import InspirationProfiles from '@/components/InspirationProfiles';
 import ShortformGrid from '@/components/ShortformGrid';
 import Analytics from '@/components/Analytics';
 import AdminPanel from '@/components/AdminPanel';
+import CustomTable from '@/components/CustomTable';
 
 const HUB = 'danas';
 const HUB_EMOJI = '🌿';
@@ -27,23 +28,27 @@ type View =
   | { type: 'pipeline'; id: string }
   | { type: 'roadmap'; pipelineId: string }
   | { type: 'grid'; pipelineId: string }
+  | { type: 'table'; pipelineId: string }
   | { type: 'music' }
   | { type: 'footage' }
   | { type: 'inspiration' }
   | { type: 'settings' }
   | { type: 'admin' };
 
-function getPipelineIcon(name: string) {
-  const lower = name.toLowerCase();
+function getPipelineIcon(p: Pipeline) {
+  if (p.pipelineType === 'youtube') return <PlaySquare size={14} />;
+  if (p.pipelineType === 'instagram') return <Layers size={14} />;
+  if (p.pipelineType === 'custom-table') return <Table2 size={14} />;
+  const lower = p.name.toLowerCase();
   if (lower.includes('youtube') || lower.includes('yt')) return <PlaySquare size={14} />;
   if (lower.includes('ig') || lower.includes('instagram') || lower.includes('reel') || lower.includes('stor')) return <Layers size={14} />;
   return <Video size={14} />;
 }
 
-const isYoutube = (name: string) => name.toLowerCase().includes('youtube') || name.toLowerCase().includes('yt');
-const isShortform = (name: string) =>
-  name.toLowerCase().includes('short') || name.toLowerCase().includes('reel') ||
-  name.toLowerCase().includes('tiktok') || name.toLowerCase().includes('clip');
+const isYoutube = (p: Pipeline) => p.pipelineType === 'youtube' || (!p.pipelineType && (p.name.toLowerCase().includes('youtube') || p.name.toLowerCase().includes('yt')));
+const isShortform = (p: Pipeline) => p.pipelineType === 'shortform' || (!p.pipelineType && (p.name.toLowerCase().includes('short') || p.name.toLowerCase().includes('reel') || p.name.toLowerCase().includes('tiktok') || p.name.toLowerCase().includes('clip')));
+const isInstagram = (p: Pipeline) => p.pipelineType === 'instagram';
+const isCustomTable = (p: Pipeline) => p.pipelineType === 'custom-table';
 
 // Mock logged-in user - in real app this would come from auth
 const CURRENT_USER = { email: 'danas@pluginfo.com', isOwner: true };
@@ -132,6 +137,11 @@ export default function HubPage() {
     await saveHubUsers(hubUsers, HUB);
   }, []);
 
+  const handleCustomTableRowsChange = useCallback(async (rows: CustomTableRow[]) => {
+    setState((prev: AppState | null) => prev ? { ...prev, customTableRows: rows } : prev);
+    await saveCustomTableRows(rows, HUB);
+  }, []);
+
   const navigate = (v: View) => { setView(v); setSidebarOpen(false); };
 
   const togglePipelineExpand = (pipelineId: string) => {
@@ -166,7 +176,7 @@ export default function HubPage() {
 
   if (!state) return null;
 
-  const activePipeline = (view.type === 'pipeline' || view.type === 'roadmap' || view.type === 'grid')
+  const activePipeline = (view.type === 'pipeline' || view.type === 'roadmap' || view.type === 'grid' || view.type === 'table')
     ? state.pipelines.find((p: Pipeline) => p.id === ((view as any).id || (view as any).pipelineId))
     : null;
 
@@ -187,6 +197,7 @@ export default function HubPage() {
     if (view.type === 'pipeline') return activePipeline?.name || '';
     if (view.type === 'roadmap') return 'Video Roadmap';
     if (view.type === 'grid') return `${activePipeline?.name || ''} Grid`;
+    if (view.type === 'table') return activePipeline?.name || 'Table';
     if (view.type === 'music') return 'Music Bank';
     if (view.type === 'footage') return 'Footage Links';
     if (view.type === 'inspiration') return 'Inspiration';
@@ -263,25 +274,31 @@ export default function HubPage() {
         {visiblePipelines.map((p: Pipeline) => {
           const isExpanded = expandedPipelines.has(p.id);
           const isPipelineActive = view.type === 'pipeline' && (view as any).id === p.id;
-          const hasYT = isYoutube(p.name);
-          const hasSF = isShortform(p.name);
+          const hasYT = isYoutube(p);
+          const hasSF = isShortform(p);
+          const hasIG = isInstagram(p);
+          const hasCT = isCustomTable(p);
           const hasSubViews = hasYT || hasSF;
           return (
             <div key={p.id}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <button
                   onClick={() => {
-                    navigate({ type: 'pipeline', id: p.id });
-                    if (hasSubViews) togglePipelineExpand(p.id);
+                    if (hasCT) {
+                      navigate({ type: 'table', pipelineId: p.id });
+                    } else {
+                      navigate({ type: 'pipeline', id: p.id });
+                      if (hasSubViews) togglePipelineExpand(p.id);
+                    }
                   }}
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px',
-                    borderRadius: 8, background: isPipelineActive ? '#1e2130' : 'none', border: 'none',
-                    color: isPipelineActive ? '#e2e8f0' : '#64748b', cursor: 'pointer', fontSize: 13,
-                    fontWeight: isPipelineActive ? 600 : 400, textAlign: 'left', transition: 'all 0.15s',
+                    borderRadius: 8, background: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id)) ? '#1e2130' : 'none', border: 'none',
+                    color: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id)) ? '#e2e8f0' : '#64748b', cursor: 'pointer', fontSize: 13,
+                    fontWeight: (isPipelineActive || (hasCT && view.type === 'table' && (view as any).pipelineId === p.id)) ? 600 : 400, textAlign: 'left', transition: 'all 0.15s',
                   }}
                 >
-                  {getPipelineIcon(p.name)}
+                  {getPipelineIcon(p)}
                   <span style={{ flex: 1 }}>{p.name}</span>
                   {hasSubViews && (
                     isExpanded
@@ -367,7 +384,7 @@ export default function HubPage() {
           </div>
         </div>
 
-        <div className="hub-content" style={{ flex: 1, overflow: 'auto', padding: 24 }}>
+        <div className="hub-content" style={{ flex: 1, overflow: view.type === 'table' ? 'hidden' : 'auto', padding: view.type === 'table' ? 0 : 24, display: 'flex', flexDirection: 'column' }}>
           {view.type === 'insights' && <Insights pipelines={state.pipelines} cards={state.cards} hubUsers={state.hubUsers || []} />}
           {view.type === 'analytics' && <Analytics cards={state.cards} channelHandle="DanasBytautas" hubSlug="danas" />}
           {view.type === 'pipeline' && activePipeline && (
@@ -386,6 +403,14 @@ export default function HubPage() {
           {view.type === 'footage' && <FootageLinks items={state.footageLinks} onChange={handleFootageChange} />}
           {view.type === 'inspiration' && <InspirationProfiles profiles={state.inspirationProfiles} onChange={handleInspirationChange} />}
           {view.type === 'settings' && <PipelineSettings pipelines={state.pipelines} onChange={handlePipelinesChange} />}
+          {view.type === 'table' && activePipeline && (
+            <CustomTable
+              pipeline={activePipeline}
+              rows={state.customTableRows || []}
+              onRowsChange={handleCustomTableRowsChange}
+              onPipelineChange={(p) => handlePipelinesChange(state.pipelines.map((pp: Pipeline) => pp.id === p.id ? p : pp))}
+            />
+          )}
           {view.type === 'admin' && (
             <AdminPanel
               hubUsers={state.hubUsers || []}
@@ -405,7 +430,7 @@ export default function HubPage() {
         {state.pipelines.slice(0, 2).map((p: Pipeline) => (
           <button key={p.id} className={`hub-mobile-nav-btn${view.type === 'pipeline' && (view as any).id === p.id ? ' active' : ''}`}
             onClick={() => navigate({ type: 'pipeline', id: p.id })}>
-            {isYoutube(p.name) ? <PlaySquare size={18} /> : <Video size={18} />}
+            {isYoutube(p) ? <PlaySquare size={18} /> : <Video size={18} />}
             <span>{p.name.length > 6 ? p.name.slice(0, 6) + '…' : p.name}</span>
           </button>
         ))}

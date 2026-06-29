@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { AppState, Pipeline, ContentCard, HubUser } from './types';
+import { AppState, Pipeline, ContentCard, HubUser, CustomTableRow } from './types';
 
 const DEFAULT_PIPELINES: Pipeline[] = [
   {
@@ -93,6 +93,8 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
         id: appPipelineId(r.id, hub),
         name: r.name,
         stages: r.stages,
+        pipelineType: r.pipeline_type || 'shortform',
+        columns: r.columns || undefined,
       }));
     } else {
       pipelines = DEFAULT_PIPELINES;
@@ -167,6 +169,7 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
       inspirationProfiles: ws.inspiration_profiles || [],
       users: ['Vainius', 'Danas'],
       hubUsers: ws.hub_users || [],
+      customTableRows: ws.custom_table_rows || [],
     };
   } catch (err) {
     console.error('loadState error:', err);
@@ -178,6 +181,7 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
       inspirationProfiles: [],
       users: ['Vainius', 'Danas'],
       hubUsers: [],
+      customTableRows: [],
     };
   }
 }
@@ -188,6 +192,8 @@ export async function savePipelines(pipelines: Pipeline[], hub = 'danas') {
       id: dbPipelineId(p.id, hub),
       name: p.name,
       stages: p.stages,
+      pipeline_type: p.pipelineType || 'shortform',
+      columns: p.columns || null,
     });
   }
   // Delete removed pipelines scoped to this hub
@@ -234,4 +240,8 @@ export async function saveWorkspaceKey(key: string, value: any, hub = 'danas') {
 
 export async function saveHubUsers(hubUsers: HubUser[], hub = 'danas') {
   await saveWorkspaceKey('hub_users', hubUsers, hub);
+}
+
+export async function saveCustomTableRows(rows: CustomTableRow[], hub = 'danas') {
+  await saveWorkspaceKey('custom_table_rows', rows, hub);
 }
