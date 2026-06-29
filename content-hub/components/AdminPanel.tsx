@@ -96,7 +96,7 @@ export default function AdminPanel({ hubUsers, pipelines, hub, onChange, onPipel
       const pType: PipelineType = newUser.newPipelineTypes[i] || 'shortform';
       if (!pName.trim()) continue;
       const newPipelineId = generateId();
-      let stages;
+      let stages: { id: string; name: string; color: string }[] = [];
       if (pType === 'youtube') stages = makeYoutubeStages();
       else if (pType === 'instagram') stages = makeInstagramStages();
       else if (pType === 'custom-table') stages = [];
