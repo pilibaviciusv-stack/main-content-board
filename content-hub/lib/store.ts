@@ -168,6 +168,9 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
       musicBank: ws.music_bank || [],
       footageLinks: ws.footage_links || [],
       inspirationProfiles: ws.inspiration_profiles || [],
+      inspirationThumbnails: ws.inspiration_thumbnails || [],
+      inspirationConcepts: ws.inspiration_concepts || [],
+      sops: ws.sops || [],
       users: ['Vainius', 'Danas'],
       hubUsers: ws.hub_users || [],
       customTableRows: ws.custom_table_rows || [],
@@ -180,6 +183,9 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
       musicBank: [],
       footageLinks: [],
       inspirationProfiles: [],
+      inspirationThumbnails: [],
+      inspirationConcepts: [],
+      sops: [],
       users: ['Vainius', 'Danas'],
       hubUsers: [],
       customTableRows: [],
@@ -249,4 +255,8 @@ export async function saveHubUsers(hubUsers: HubUser[], hub = 'danas') {
 
 export async function saveCustomTableRows(rows: CustomTableRow[], hub = 'danas') {
   await saveWorkspaceKey('custom_table_rows', rows, hub);
+}
+
+export async function saveSops(sops: any[], hub = 'danas') {
+  await saveWorkspaceKey('sops', sops, hub);
 }

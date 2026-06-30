@@ -282,7 +282,7 @@ export default function InspirationProfiles({ profiles, onChange }: Props) {
   };
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#e2e8f0' }}>Inspiration Profiles</h2>
@@ -302,7 +302,7 @@ export default function InspirationProfiles({ profiles, onChange }: Props) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {profiles.map(profile => (
           <ProfileCard
             key={profile.id}

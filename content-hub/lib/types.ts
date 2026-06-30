@@ -104,12 +104,33 @@ export interface CreatorProfile {
   tags: string;
 }
 
+export interface SopLink {
+  id: string;
+  name: string;
+  link: string;
+}
+
+export interface InspirationThumbnail {
+  id: string;
+  title: string;
+  imageUrl: string;
+}
+
+export interface InspirationConcept {
+  id: string;
+  name: string;
+  explanation: string;
+}
+
 export interface AppState {
   pipelines: Pipeline[];
   cards: ContentCard[];
   musicBank: MusicTrack[];
   footageLinks: FootageItem[];
   inspirationProfiles: CreatorProfile[];
+  inspirationThumbnails: InspirationThumbnail[];
+  inspirationConcepts: InspirationConcept[];
+  sops: SopLink[];
   users: string[];
   hubUsers: HubUser[];
   customTableRows: CustomTableRow[];

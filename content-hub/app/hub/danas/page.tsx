@@ -1,20 +1,21 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp, Home, ArrowLeft, ChevronDown, ChevronRight, Shield, Table2 } from 'lucide-react';
+import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp, Home, ArrowLeft, ChevronDown, ChevronRight, Shield, Table2, FileText } from 'lucide-react';
 import { AppState, ContentCard, Pipeline, CustomTableRow } from '@/lib/types';
-import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey, saveHubUsers, saveCustomTableRows } from '@/lib/store';
+import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey, saveHubUsers, saveCustomTableRows, saveSops } from '@/lib/store';
 import Board from '@/components/Board';
 import MusicBank from '@/components/MusicBank';
 import FootageLinks from '@/components/FootageLinks';
 import PipelineSettings from '@/components/PipelineSettings';
 import Insights from '@/components/Insights';
 import YoutubeRoadmap from '@/components/YoutubeRoadmap';
-import InspirationProfiles from '@/components/InspirationProfiles';
+import InspirationHub from '@/components/InspirationHub';
 import ShortformGrid from '@/components/ShortformGrid';
 import Analytics from '@/components/Analytics';
 import AdminPanel from '@/components/AdminPanel';
 import CustomTable from '@/components/CustomTable';
+import Sops from '@/components/Sops';
 
 const HUB = 'danas';
 const HUB_EMOJI = '🌿';
@@ -32,6 +33,7 @@ type View =
   | { type: 'music' }
   | { type: 'footage' }
   | { type: 'inspiration' }
+  | { type: 'sops' }
   | { type: 'settings' }
   | { type: 'admin' };
 
@@ -132,6 +134,21 @@ export default function HubPage() {
     await saveWorkspaceKey('inspiration_profiles', inspirationProfiles, HUB);
   }, []);
 
+  const handleInspirationThumbnailsChange = useCallback(async (inspirationThumbnails: any[]) => {
+    setState((prev: AppState | null) => prev ? { ...prev, inspirationThumbnails } : prev);
+    await saveWorkspaceKey('inspiration_thumbnails', inspirationThumbnails, HUB);
+  }, []);
+
+  const handleInspirationConceptsChange = useCallback(async (inspirationConcepts: any[]) => {
+    setState((prev: AppState | null) => prev ? { ...prev, inspirationConcepts } : prev);
+    await saveWorkspaceKey('inspiration_concepts', inspirationConcepts, HUB);
+  }, []);
+
+  const handleSopsChange = useCallback(async (sops: any[]) => {
+    setState((prev: AppState | null) => prev ? { ...prev, sops } : prev);
+    await saveSops(sops, HUB);
+  }, []);
+
   const handleHubUsersChange = useCallback(async (hubUsers: any[]) => {
     setState((prev: AppState | null) => prev ? { ...prev, hubUsers } : prev);
     await saveHubUsers(hubUsers, HUB);
@@ -201,6 +218,7 @@ export default function HubPage() {
     if (view.type === 'music') return 'Music Bank';
     if (view.type === 'footage') return 'Footage Links';
     if (view.type === 'inspiration') return 'Inspiration';
+    if (view.type === 'sops') return 'SOPs';
     if (view.type === 'admin') return 'Team Access';
     return 'Settings';
   };
@@ -217,6 +235,7 @@ export default function HubPage() {
   const canViewMusic = !isHubUser || perms?.isAdmin || perms?.canViewMusic;
   const canViewFootage = !isHubUser || perms?.isAdmin || perms?.canViewFootage;
   const canViewInspiration = !isHubUser || perms?.isAdmin || perms?.canViewInspiration;
+  const canViewSops = !isHubUser || perms?.isAdmin || perms?.canViewInspiration;
   const canViewAdmin = !isHubUser || perms?.isAdmin;
 
   const sidebarInner = (
@@ -324,6 +343,7 @@ export default function HubPage() {
           {canViewMusic && navBtn('Music Bank', <Music size={14} />, view.type === 'music', () => navigate({ type: 'music' }))}
           {canViewFootage && navBtn('Footage Links', <Film size={14} />, view.type === 'footage', () => navigate({ type: 'footage' }))}
           {canViewInspiration && navBtn('Inspiration', <Users size={14} />, view.type === 'inspiration', () => navigate({ type: 'inspiration' }))}
+          {canViewSops && navBtn('SOPs', <FileText size={14} />, view.type === 'sops', () => navigate({ type: 'sops' }))}
         </div>
         {canViewAdmin && (
           <div style={{ marginTop: 16 }}>
@@ -402,7 +422,17 @@ export default function HubPage() {
           )}
           {view.type === 'music' && <MusicBank tracks={state.musicBank} onChange={handleMusicChange} />}
           {view.type === 'footage' && <FootageLinks items={state.footageLinks} onChange={handleFootageChange} />}
-          {view.type === 'inspiration' && <InspirationProfiles profiles={state.inspirationProfiles} onChange={handleInspirationChange} />}
+          {view.type === 'inspiration' && (
+            <InspirationHub
+              profiles={state.inspirationProfiles}
+              onProfilesChange={handleInspirationChange}
+              thumbnails={state.inspirationThumbnails || []}
+              onThumbnailsChange={handleInspirationThumbnailsChange}
+              concepts={state.inspirationConcepts || []}
+              onConceptsChange={handleInspirationConceptsChange}
+            />
+          )}
+          {view.type === 'sops' && <Sops sops={state.sops || []} onChange={handleSopsChange} />}
           {view.type === 'settings' && <PipelineSettings pipelines={state.pipelines} onChange={handlePipelinesChange} />}
           {view.type === 'table' && activePipeline && (
             <CustomTable
