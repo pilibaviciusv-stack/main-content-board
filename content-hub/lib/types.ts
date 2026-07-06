@@ -130,6 +130,8 @@ export interface AppState {
   inspirationProfiles: CreatorProfile[];
   inspirationThumbnails: InspirationThumbnail[];
   inspirationConcepts: InspirationConcept[];
+  sfInspirationProfiles: CreatorProfile[];
+  sfInspirationConcepts: InspirationConcept[];
   sops: SopLink[];
   users: string[];
   hubUsers: HubUser[];

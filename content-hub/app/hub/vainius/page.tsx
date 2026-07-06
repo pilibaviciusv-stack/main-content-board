@@ -144,6 +144,16 @@ export default function HubPage() {
     await saveWorkspaceKey('inspiration_concepts', inspirationConcepts, HUB);
   }, []);
 
+  const handleSfInspirationChange = useCallback(async (sfInspirationProfiles: any[]) => {
+    setState((prev: AppState | null) => prev ? { ...prev, sfInspirationProfiles } : prev);
+    await saveWorkspaceKey('sf_inspiration_profiles', sfInspirationProfiles, HUB);
+  }, []);
+
+  const handleSfInspirationConceptsChange = useCallback(async (sfInspirationConcepts: any[]) => {
+    setState((prev: AppState | null) => prev ? { ...prev, sfInspirationConcepts } : prev);
+    await saveWorkspaceKey('sf_inspiration_concepts', sfInspirationConcepts, HUB);
+  }, []);
+
   const handleSopsChange = useCallback(async (sops: any[]) => {
     setState((prev: AppState | null) => prev ? { ...prev, sops } : prev);
     await saveSops(sops, HUB);
@@ -430,6 +440,10 @@ export default function HubPage() {
               onThumbnailsChange={handleInspirationThumbnailsChange}
               concepts={state.inspirationConcepts || []}
               onConceptsChange={handleInspirationConceptsChange}
+              sfProfiles={state.sfInspirationProfiles || []}
+              onSfProfilesChange={handleSfInspirationChange}
+              sfConcepts={state.sfInspirationConcepts || []}
+              onSfConceptsChange={handleSfInspirationConceptsChange}
             />
           )}
           {view.type === 'sops' && <Sops sops={state.sops || []} onChange={handleSopsChange} />}
