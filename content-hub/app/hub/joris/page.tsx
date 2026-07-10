@@ -1,9 +1,9 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp, Home, ArrowLeft, ChevronDown, ChevronRight, Shield, Table2, FileText } from 'lucide-react';
-import { AppState, ContentCard, Pipeline, CustomTableRow } from '@/lib/types';
-import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey, saveHubUsers, saveCustomTableRows, saveSops } from '@/lib/store';
+import { Music, Film, Settings, Plus, Layers, PlaySquare, Video, BarChart2, Map, Users, Grid3x3, TrendingUp, Home, ArrowLeft, ChevronDown, ChevronRight, Shield, Table2, FileText, Target } from 'lucide-react';
+import { AppState, ContentCard, Pipeline, CustomTableRow, IdeationScore, IdeationConfig } from '@/lib/types';
+import { loadState, savePipelines, saveCard, deleteCard, saveWorkspaceKey, saveHubUsers, saveCustomTableRows, saveSops, saveIdeationScores, saveIdeationConfig } from '@/lib/store';
 import Board from '@/components/Board';
 import MusicBank from '@/components/MusicBank';
 import FootageLinks from '@/components/FootageLinks';
@@ -16,6 +16,7 @@ import Analytics from '@/components/Analytics';
 import AdminPanel from '@/components/AdminPanel';
 import CustomTable from '@/components/CustomTable';
 import Sops from '@/components/Sops';
+import IdeationScoring from '@/components/IdeationScoring';
 
 const HUB = 'joris';
 const HUB_EMOJI = '🎯';
@@ -34,6 +35,7 @@ type View =
   | { type: 'footage' }
   | { type: 'inspiration' }
   | { type: 'sops' }
+  | { type: 'ideation' }
   | { type: 'settings' }
   | { type: 'admin' };
 
@@ -169,6 +171,16 @@ export default function HubPage() {
     await saveCustomTableRows(rows, HUB);
   }, []);
 
+  const handleIdeationScoresChange = useCallback(async (scores: IdeationScore[]) => {
+    setState((prev: AppState | null) => prev ? { ...prev, ideationScores: scores } : prev);
+    await saveIdeationScores(scores, HUB);
+  }, []);
+
+  const handleIdeationConfigChange = useCallback(async (config: IdeationConfig) => {
+    setState((prev: AppState | null) => prev ? { ...prev, ideationConfig: config } : prev);
+    await saveIdeationConfig(config, HUB);
+  }, []);
+
   const navigate = (v: View) => { setView(v); setSidebarOpen(false); };
 
   const togglePipelineExpand = (pipelineId: string) => {
@@ -229,6 +241,7 @@ export default function HubPage() {
     if (view.type === 'footage') return 'Footage Links';
     if (view.type === 'inspiration') return 'Inspiration';
     if (view.type === 'sops') return 'SOPs';
+    if (view.type === 'ideation') return 'Ideation Scoring';
     if (view.type === 'admin') return 'Team Access';
     return 'Settings';
   };
@@ -354,6 +367,7 @@ export default function HubPage() {
           {canViewFootage && navBtn('Footage Links', <Film size={14} />, view.type === 'footage', () => navigate({ type: 'footage' }))}
           {canViewInspiration && navBtn('Inspiration', <Users size={14} />, view.type === 'inspiration', () => navigate({ type: 'inspiration' }))}
           {canViewSops && navBtn('SOPs', <FileText size={14} />, view.type === 'sops', () => navigate({ type: 'sops' }))}
+          {navBtn('Ideation Scoring', <Target size={14} />, view.type === 'ideation', () => navigate({ type: 'ideation' }))}
         </div>
         {canViewAdmin && (
           <div style={{ marginTop: 16 }}>
@@ -447,6 +461,15 @@ export default function HubPage() {
             />
           )}
           {view.type === 'sops' && <Sops sops={state.sops || []} onChange={handleSopsChange} />}
+          {view.type === 'ideation' && (
+            <IdeationScoring
+              scores={state.ideationScores || []}
+              config={state.ideationConfig || null}
+              onChange={handleIdeationScoresChange}
+              onConfigChange={handleIdeationConfigChange}
+              accent={HUB_ACCENT}
+            />
+          )}
           {view.type === 'settings' && <PipelineSettings pipelines={state.pipelines} onChange={handlePipelinesChange} />}
           {view.type === 'table' && activePipeline && (
             <CustomTable

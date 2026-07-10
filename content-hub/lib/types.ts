@@ -122,6 +122,32 @@ export interface InspirationConcept {
   explanation: string;
 }
 
+export interface IdeationDimension {
+  id: string;
+  label: string;
+  weight: number;
+  description: string;
+  anchors: string[];
+  hasLinks?: boolean;
+}
+
+export interface IdeationScore {
+  id: string;
+  title: string;
+  reasoning: string;
+  scorer: string;
+  values: number[];
+  score: number;
+  verdict: string;
+  referenceLinks: string;
+  date: string;
+  ts: number;
+}
+
+export interface IdeationConfig {
+  dimensions: IdeationDimension[];
+}
+
 export interface AppState {
   pipelines: Pipeline[];
   cards: ContentCard[];
@@ -136,4 +162,6 @@ export interface AppState {
   users: string[];
   hubUsers: HubUser[];
   customTableRows: CustomTableRow[];
+  ideationScores: IdeationScore[];
+  ideationConfig: IdeationConfig | null;
 }

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { AppState, Pipeline, ContentCard, HubUser, CustomTableRow } from './types';
+import { AppState, Pipeline, ContentCard, HubUser, CustomTableRow, IdeationScore, IdeationConfig } from './types';
 
 const DEFAULT_PIPELINES: Pipeline[] = [
   {
@@ -176,6 +176,8 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
       users: ['Vainius', 'Danas'],
       hubUsers: ws.hub_users || [],
       customTableRows: ws.custom_table_rows || [],
+      ideationScores: ws.ideation_scores || [],
+      ideationConfig: ws.ideation_config || null,
     };
   } catch (err) {
     console.error('loadState error:', err);
@@ -193,6 +195,8 @@ export async function loadState(hub = 'danas'): Promise<AppState> {
       users: ['Vainius', 'Danas'],
       hubUsers: [],
       customTableRows: [],
+      ideationScores: [],
+      ideationConfig: null,
     };
   }
 }
@@ -263,4 +267,12 @@ export async function saveCustomTableRows(rows: CustomTableRow[], hub = 'danas')
 
 export async function saveSops(sops: any[], hub = 'danas') {
   await saveWorkspaceKey('sops', sops, hub);
+}
+
+export async function saveIdeationScores(scores: IdeationScore[], hub = 'danas') {
+  await saveWorkspaceKey('ideation_scores', scores, hub);
+}
+
+export async function saveIdeationConfig(config: IdeationConfig, hub = 'danas') {
+  await saveWorkspaceKey('ideation_config', config, hub);
 }
