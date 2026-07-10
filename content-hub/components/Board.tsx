@@ -100,7 +100,18 @@ export default function Board({ pipeline, cards, users, onCardsChange, onCardSav
                                 boxShadow: snapshot.isDragging ? '0 8px 30px rgba(99,102,241,0.25)' : 'none',
                                 userSelect: 'none',
                               }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.4, marginBottom: 10 }}>{card.title}</div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.4, marginBottom: 10, display: 'flex', alignItems: 'start', gap: 6 }}>
+                                {(card as any).ideationScore && (
+                                  <span style={{
+                                    flexShrink: 0, fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4,
+                                    background: (card as any).ideationScore >= 80 ? '#052e16' : '#172554',
+                                    color: (card as any).ideationScore >= 80 ? '#22c55e' : '#3b82f6',
+                                    border: `1px solid ${(card as any).ideationScore >= 80 ? '#22c55e30' : '#3b82f630'}`,
+                                    fontFamily: 'monospace', marginTop: 2,
+                                  }}>{(card as any).ideationScore}</span>
+                                )}
+                                <span>{card.title}</span>
+                              </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: TYPE_COLORS[card.type] + '22', color: TYPE_COLORS[card.type], textTransform: 'uppercase', letterSpacing: '0.06em' }}>{card.type.split(' ')[0]}</span>
                                 {card.editor && <span style={{ fontSize: 11, color: '#64748b', background: '#1e2130', padding: '2px 7px', borderRadius: 4 }}>{card.editor}</span>}

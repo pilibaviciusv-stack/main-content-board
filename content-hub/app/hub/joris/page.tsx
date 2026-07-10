@@ -35,7 +35,7 @@ type View =
   | { type: 'footage' }
   | { type: 'inspiration' }
   | { type: 'sops' }
-  | { type: 'ideation' }
+  | { type: 'ideation'; pipelineId: string }
   | { type: 'settings' }
   | { type: 'admin' };
 
@@ -181,6 +181,48 @@ export default function HubPage() {
     await saveIdeationConfig(config, HUB);
   }, []);
 
+  const getSentIdeaIds = useCallback(() => {
+    if (!state) return new Set<string>();
+    const ids = new Set<string>();
+    state.cards.forEach((c: ContentCard) => {
+      if ((c as any).ideationScoreId) ids.add((c as any).ideationScoreId);
+    });
+    return ids;
+  }, [state]);
+
+  const handleSendIdeaToPipeline = useCallback(async (idea: any, pipeline: Pipeline) => {
+    const firstStage = pipeline.stages[0];
+    if (!firstStage) return;
+    const newCard: ContentCard = {
+      id: Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
+      title: idea.title || "Untitled",
+      stageId: firstStage.id,
+      pipelineId: pipeline.id,
+      type: "Top of Funnel" as any,
+      editor: idea.scorer || "",
+      format: "",
+      scheduledDate: "",
+      cost: "",
+      headline: "",
+      rawFileLink: "",
+      referenceLink: idea.referenceLinks || "",
+      frameLink: "",
+      musicLink: "",
+      videoLink: "",
+      idea: idea.reasoning || "",
+      hook: "",
+      body: "",
+      thumbnail: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ideationScoreId: idea.id,
+      ideationScore: idea.score,
+      ideationVerdict: idea.verdict,
+    } as any;
+    setState((prev: AppState | null) => prev ? { ...prev, cards: [...prev.cards, newCard] } : prev);
+    await saveCard(newCard, HUB);
+  }, []);
+
   const navigate = (v: View) => { setView(v); setSidebarOpen(false); };
 
   const togglePipelineExpand = (pipelineId: string) => {
@@ -215,7 +257,7 @@ export default function HubPage() {
 
   if (!state) return null;
 
-  const activePipeline = (view.type === 'pipeline' || view.type === 'roadmap' || view.type === 'grid' || view.type === 'table')
+  const activePipeline = (view.type === 'pipeline' || view.type === 'roadmap' || view.type === 'grid' || view.type === 'table' || view.type === 'ideation')
     ? state.pipelines.find((p: Pipeline) => p.id === ((view as any).id || (view as any).pipelineId))
     : null;
 
@@ -325,6 +367,7 @@ export default function HubPage() {
             isPipelineActive ||
             (hasYT && view.type === 'roadmap' && (view as any).pipelineId === p.id) ||
             (hasSF && view.type === 'grid' && (view as any).pipelineId === p.id) ||
+            (hasSF && view.type === 'ideation' && (view as any).pipelineId === p.id) ||
             (hasCT && view.type === 'table' && (view as any).pipelineId === p.id);
 
           return (
@@ -357,6 +400,7 @@ export default function HubPage() {
               {/* YouTube: Roadmap sub-item. Shortform: Grid sub-item. IG: nothing. */}
               {hasYT && isExpanded && navBtn('Roadmap', <Map size={12} />, view.type === 'roadmap' && (view as any).pipelineId === p.id, () => navigate({ type: 'roadmap', pipelineId: p.id }), true)}
               {hasSF && isExpanded && navBtn('Grid', <Grid3x3 size={12} />, view.type === 'grid' && (view as any).pipelineId === p.id, () => navigate({ type: 'grid', pipelineId: p.id }), true)}
+              {hasSF && isExpanded && navBtn('Ideation', <Target size={12} />, view.type === 'ideation' && (view as any).pipelineId === p.id, () => navigate({ type: 'ideation', pipelineId: p.id }), true)}
             </div>
           );
         })}
@@ -367,7 +411,6 @@ export default function HubPage() {
           {canViewFootage && navBtn('Footage Links', <Film size={14} />, view.type === 'footage', () => navigate({ type: 'footage' }))}
           {canViewInspiration && navBtn('Inspiration', <Users size={14} />, view.type === 'inspiration', () => navigate({ type: 'inspiration' }))}
           {canViewSops && navBtn('SOPs', <FileText size={14} />, view.type === 'sops', () => navigate({ type: 'sops' }))}
-          {navBtn('Ideation Scoring', <Target size={14} />, view.type === 'ideation', () => navigate({ type: 'ideation' }))}
         </div>
         {canViewAdmin && (
           <div style={{ marginTop: 16 }}>
@@ -461,12 +504,16 @@ export default function HubPage() {
             />
           )}
           {view.type === 'sops' && <Sops sops={state.sops || []} onChange={handleSopsChange} />}
-          {view.type === 'ideation' && (
+          {view.type === 'ideation' && activePipeline && (
             <IdeationScoring
               scores={state.ideationScores || []}
               config={state.ideationConfig || null}
+              pipelineId={(view as any).pipelineId}
+              pipelineName={activePipeline.name}
               onChange={handleIdeationScoresChange}
               onConfigChange={handleIdeationConfigChange}
+              onSendToPipeline={(idea) => handleSendIdeaToPipeline(idea, activePipeline)}
+              sentIds={getSentIdeaIds()}
               accent={HUB_ACCENT}
             />
           )}

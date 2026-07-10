@@ -133,6 +133,7 @@ export interface IdeationDimension {
 
 export interface IdeationScore {
   id: string;
+  pipelineId: string;
   title: string;
   reasoning: string;
   scorer: string;
