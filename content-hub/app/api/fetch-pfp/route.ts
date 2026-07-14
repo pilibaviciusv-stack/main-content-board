@@ -54,33 +54,81 @@ async function fetchYoutubePfp(url: string): Promise<string | null> {
   }
 }
 
-async function fetchInstagramPfp(url: string): Promise<string | null> {
-  try {
-    const handle = extractInstagramHandle(url);
-    if (!handle) return null;
+const DESKTOP_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-    const res = await fetch(
-      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${handle}`,
-      {
-        headers: {
-          'x-ig-app-id': '936619743392459',
-          'User-Agent': 'Instagram 101.0.0.15.120 Android',
-        },
+function unescapeIgUrl(raw: string): string {
+  let clean = raw;
+  for (let i = 0; i < 6; i++) clean = clean.replace(/\\\\/g, '\\');
+  return clean.replace(/\\\//g, '/').replace(/\\u0026/g, '&').replace(/&amp;/g, '&');
+}
+
+function isRealIgPfp(u: string | null): u is string {
+  // Reject the login-wall / generic logo assets
+  if (!u) return false;
+  if (u.includes('static.cdninstagram.com/rsrc')) return false;
+  if (!/cdninstagram\.com|fbcdn\.net/.test(u)) return false;
+  return true;
+}
+
+// Strategy 1: the public /embed/ page — intermittently exposes profile_pic_url
+async function igFromEmbed(handle: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://www.instagram.com/${handle}/embed/`, {
+      headers: { 'User-Agent': DESKTOP_UA, 'Accept-Language': 'en-US,en;q=0.9' },
+    });
+    const html = await res.text();
+    const i = html.indexOf('profile_pic_url');
+    if (i >= 0) {
+      const seg = html.slice(i, i + 800);
+      const m = seg.match(/(https.*?\.jpg[^"\\]*)/);
+      if (m) {
+        const u = unescapeIgUrl(m[1]);
+        if (isRealIgPfp(u)) return u;
       }
-    );
-    const data = await res.json();
-    const user = data?.data?.user;
-    return user?.profile_pic_url_hd || user?.profile_pic_url || null;
+    }
+    // og:image fallback inside the same page
+    const og = html.match(/property="og:image"\s+content="([^"]+)"/);
+    if (og) {
+      const u = unescapeIgUrl(og[1]);
+      if (isRealIgPfp(u)) return u;
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
+// Strategy 2: the mobile web_profile_info endpoint (works when IG hasn't rate-limited us)
+async function igFromWebProfile(handle: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${handle}`,
+      { headers: { 'x-ig-app-id': '936619743392459', 'User-Agent': DESKTOP_UA } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const user = data?.data?.user;
+    const u = user?.profile_pic_url_hd || user?.profile_pic_url || null;
+    return isRealIgPfp(u) ? u : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchInstagramPfp(url: string): Promise<string | null> {
+  const handle = extractInstagramHandle(url);
+  if (!handle) return null;
+  // Best-effort chain — first strategy that yields a real pfp wins
+  return (await igFromEmbed(handle)) || (await igFromWebProfile(handle)) || null;
+}
+
 // Proxy an external image through this server to avoid CORS/referrer issues
 async function proxyFetch(imageUrl: string): Promise<Response> {
+  const isIg = /cdninstagram\.com|fbcdn\.net/.test(imageUrl);
   const upstream = await fetch(imageUrl, {
     headers: {
-      'Referer': 'https://www.youtube.com/',
+      'Referer': isIg ? 'https://www.instagram.com/' : 'https://www.youtube.com/',
       'User-Agent': 'Mozilla/5.0',
     },
   });

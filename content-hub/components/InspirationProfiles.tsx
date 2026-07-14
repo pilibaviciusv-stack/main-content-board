@@ -24,6 +24,18 @@ function generateId() {
   return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 }
 
+// IG/YT CDN urls hotlink-block and expire; route them through our proxy.
+// Data URLs (manual uploads) and already-proxied urls pass through untouched.
+function proxied(url: string): string {
+  if (!url) return url;
+  if (url.startsWith('data:')) return url;
+  if (url.includes('/api/fetch-pfp?proxy=')) return url;
+  if (/cdninstagram\.com|fbcdn\.net|ggpht\.com|googleusercontent\.com/.test(url)) {
+    return `/api/fetch-pfp?proxy=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 function Avatar({ url, name, size = 48 }: { url: string; name: string; size?: number }) {
   const [err, setErr] = useState(false);
   // Reset error when url changes
@@ -39,7 +51,7 @@ function Avatar({ url, name, size = 48 }: { url: string; name: string; size?: nu
       </div>
     );
   }
-  return <img src={url} alt={name} onError={() => setErr(true)} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />;
+  return <img src={proxied(url)} alt={name} onError={() => setErr(true)} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />;
 }
 
 async function fetchPfp(url: string, platform: 'youtube' | 'instagram'): Promise<string | null> {
@@ -186,6 +198,38 @@ function ProfileCard({ profile, onDelete, onUpdate }: {
             <RefreshCw size={11} /> Refresh
           </button>
         </div>
+
+        {/* Manual IG pfp fallback — Instagram auto-fetch is unreliable, so paste an image URL or upload a file */}
+        {draft.instagramUrl && !draft.instagramPfp && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: '#0d0f14', border: '1px dashed #2d3148', borderRadius: 8, padding: '10px 12px' }}>
+            <span style={{ fontSize: 11, color: '#64748b' }}>
+              IG auto-fetch didn't return a pfp. Paste an image URL or upload one:
+            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                value={draft.instagramPfp}
+                onChange={e => setDraft(p => ({ ...p, instagramPfp: e.target.value }))}
+                style={inputStyle}
+                placeholder="Paste image URL..."
+              />
+              <label style={{ background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8', borderRadius: 7, padding: '7px 12px', cursor: 'pointer', fontSize: 11, whiteSpace: 'nowrap' }}>
+                Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => setDraft(p => ({ ...p, instagramPfp: reader.result as string }));
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Tags</label>
